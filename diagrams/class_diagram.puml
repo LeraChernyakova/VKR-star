@@ -1,0 +1,26 @@
+@startuml
+
+class ProcessingChain {}
+
+class ImageProcessor {}
+
+class AstrometryCalibrator {}
+
+class ObjectClassifier {}
+
+class StarCatalogAdapter {}
+
+class UnknownObjectLocator {}
+
+ProcessingChain <|-- ImageProcessor
+ProcessingChain <|-- AstrometryCalibrator
+ProcessingChain <|-- ObjectClassifier
+ProcessingChain <|-- UnknownObjectLocator
+
+ProcessingChain -left-> ProcessingChain
+
+AstrometryCalibrator o-- AstrometryAPIClient
+
+ObjectClassifier o-- StarCatalogAdapter
+
+@enduml
