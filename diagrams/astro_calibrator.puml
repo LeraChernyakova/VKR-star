@@ -1,0 +1,22 @@
+@startuml
+participant "AstrometryCalibrator" as ac
+participant "AstrometryAPIClient" as api
+participant "Astrometry.net" as astro
+
+activate ac
+ac -> api : Запрос в Astrometry.net\n(изображение)
+activate api
+api -> astro : Отправка запроса на калибровку
+activate astro
+astro -> astro : Обработка
+alt Найдено соответствие
+  astro -> api : Координаты изображения найдены\n+ Информация об объектах на снимке
+  api -> ac : Передача:\n- координат\n- параметров изображения\n- объекты на снимке
+else Не найдено соответствие
+  astro -> api : Ошибка - координаты не определены
+  deactivate astro
+  api -> ac : Сообщение об ошибке
+  deactivate api
+end
+deactivate ac
+@enduml

@@ -1,0 +1,30 @@
+@startuml
+participant "ObjectClassifier" as oc
+participant "StarCatalogAdapter" as adapter
+participant "Astronomical Catalogs API" as catalog
+
+activate oc
+oc -> oc : Извлечение характеристик объектов\n(размер, яркость и др.)
+oc -> oc : Преобразование пиксельных координат\nв экваториальные (RA, Dec)
+oc -> adapter : Запрос данных по координатам (RA, Dec)
+activate adapter
+adapter -> catalog : Поиск объекта в каталогах (учёт погрешности)
+activate catalog
+alt Объект найден в каталоге
+    catalog -> adapter : Данные о найденном объекте
+    adapter -> oc : Передача информации о найденном объекте
+    oc -> oc : Сравнение характеристик объекта
+    alt Характеристики совпадают
+        oc -> oc : Объект классифицирован как известный
+    else Характеристики не совпадают
+        oc -> oc : Неизвестный объект
+    end
+else Объект не найден
+    catalog -> adapter : Объект отсутствует в справочниках
+    deactivate catalog
+    adapter -> oc : Сообщение о неизвестном объекте
+    deactivate adapter
+    oc -> oc : Объект классифицирован как неизвестный
+end
+deactivate oc
+@enduml
