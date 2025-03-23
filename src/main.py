@@ -1,6 +1,8 @@
-from src.ImageProcessing.StarDetector import StarDetector
+from tkinter import Tk
+from src.GUI.gui import AstrometryApp
 
 if __name__ == "__main__":
-    detector = StarDetector()
-    image, corners = detector.detect_stars("../images/star.jpg")
-    detector.draw_detections(image, corners)
+    root = Tk()
+    root.geometry("400x300")
+    app = AstrometryApp(root)
+    root.mainloop()
