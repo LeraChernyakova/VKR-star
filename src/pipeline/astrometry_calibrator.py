@@ -1,3 +1,4 @@
+import os
 import time
 from src.pipeline.processing_chain import ProcessingChain
 from src.pipeline.astrometry_api_client import AstrometryAPIClient
@@ -5,8 +6,8 @@ from src.utils.logger import Logger
 
 
 class AstrometryCalibrator(ProcessingChain):
-    def __init__(self, api_key):
-        super().__init__()
+    def __init__(self, api_key, next_processor=None):
+        super().__init__(next_processor)
         self.client = AstrometryAPIClient(api_key)
         self.logger = Logger()
 
@@ -19,8 +20,26 @@ class AstrometryCalibrator(ProcessingChain):
             job_id = self.wait_for_job_completion(submission_id)
             if job_id:
                 self.logger.info(f"Job completed successfully, job ID: {job_id}")
-                result = self.client.get_job_result(job_id)
-                return result
+                base_dir = os.path.dirname(image_path)
+                base_name = os.path.splitext(os.path.basename(image_path))[0]
+
+                wcs_path = os.path.join(base_dir, f"{base_name}_wcs.fits")
+                rdls_path = os.path.join(base_dir, f"{base_name}_rdls.rdls")
+
+                self.client.download_result_file(job_id, "wcs_file", wcs_path)
+                self.client.download_result_file(job_id, "rdls_file", rdls_path)
+
+                context = {
+                    "image_path": image_path,
+                    "job_id": job_id,
+                    "wcs_path": wcs_path,
+                    "rdls_path": rdls_path
+                }
+
+                if self.next_processor:
+                    return self.next_processor.handle(context)
+
+                return context
             else:
                 self.logger.error('Job did not complete successfully within the timeout period')
                 raise Exception('Job did not complete successfully')

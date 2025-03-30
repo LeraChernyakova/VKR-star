@@ -2,9 +2,12 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import threading
 import os
+from PIL import Image, ImageTk
 
 from src.pipeline.astrometry_api_client import AstrometryAPIClient
 from src.pipeline.image_processor import ImageProcessor
+from src.pipeline.astrometry_calibrator import AstrometryCalibrator
+from src.pipeline.object_classifier import ObjectClassifier
 from src.utils.logger import Logger
 
 class AstrometryApp:
@@ -16,6 +19,9 @@ class AstrometryApp:
         self.file_path = None
         self.image_processor = ImageProcessor()
         self.logger = Logger()
+
+        self.object_classifier = ObjectClassifier()
+        self.astrometry_calibrator = AstrometryCalibrator(self.api_key, self.object_classifier)
 
         self._build_ui()
 
@@ -50,6 +56,9 @@ class AstrometryApp:
 
         self.label_status = ttk.Label(frame, text="Статус: —", foreground="black")
         self.label_status.pack(**padding)
+
+        self.image_preview = tk.Label(frame)
+        self.image_preview.pack(pady=10)
 
     def _build_info_tab(self, frame):
         info_text = (
@@ -88,15 +97,42 @@ class AstrometryApp:
             self._update_status("Файл загружен. Ожидание обработки...", "blue")
 
             job_id = self._wait_for_job(submission_id)
-            if job_id:
-                result = self.client.get_job_result(job_id)
-                self._update_status("Готово", "green")
-                print("Результат:", result)
-            else:
+            if not job_id:
                 self._update_status("Ошибка: обработка не завершилась", "red")
+                return
+
+            self._update_status("Загрузка результатов...", "blue")
+            base_dir = os.path.dirname(self.file_path)
+            base_name = os.path.splitext(os.path.basename(self.file_path))[0]
+
+            wcs_path = os.path.join(base_dir, f"{base_name}_wcs.fits")
+            rdls_path = os.path.join(base_dir, f"{base_name}_rdls.rdls")
+
+            self.client.download_result_file(job_id, "wcs_file", wcs_path)
+            self.client.download_result_file(job_id, "rdls_file", rdls_path)
+
+            context = {
+                "image_path": self.file_path,
+                "job_id": job_id,
+                "wcs_path": wcs_path,
+                "rdls_path": rdls_path
+            }
+
+            self._update_status("Анализ объектов...", "blue")
+            result = self.object_classifier.handle(context)
+
+            highlighted_path = result.get("highlighted_path")
+            if highlighted_path and os.path.exists(highlighted_path):
+                self._show_image(highlighted_path)
+                unknown_count = result.get("unknown_count", 0)
+                total_objects = result.get("total_objects", 0)
+                self._update_status(f"Обнаружено {unknown_count} неизвестных объектов из {total_objects}", "green")
+            else:
+                self._update_status("Обработка завершена, но изображение недоступно", "orange")
 
         except Exception as e:
             self._update_status(f"Ошибка: {str(e)}", "red")
+            self.logger.error(f"Error in processing upload: {str(e)}")
 
     def _wait_for_job(self, subid, timeout=300, interval=5):
         import time
@@ -117,3 +153,13 @@ class AstrometryApp:
 
     def _update_status(self, text, color):
         self.label_status.config(text=f"Статус: {text}", foreground=color)
+
+    def _show_image(self, image_path):
+        try:
+            image = Image.open(image_path)
+            image.thumbnail((300, 300))
+            photo = ImageTk.PhotoImage(image)
+            self.image_preview.configure(image=photo)
+            self.image_preview.image = photo
+        except Exception as e:
+            print(f"Ошибка отображения изображения: {e}")

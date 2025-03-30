@@ -139,3 +139,22 @@ class AstrometryAPIClient:
         except Exception as e:
             self.logger.error(f"Error getting annotations: {str(e)}")
             raise
+
+    def download_result_file(self, job_id, file_type, save_path):
+        url = f"http://nova.astrometry.net/{file_type}/{job_id}"
+        self.logger.info(f"Downloading {file_type} from {url}")
+
+        try:
+            response = requests.get(url)
+            if response.status_code == 200:
+                with open(save_path, 'wb') as f:
+                    f.write(response.content)
+                self.logger.info(f"Successfully downloaded {file_type} to {save_path}")
+                return True
+            else:
+                self.logger.error(f"Failed to download {file_type}, status code: {response.status_code}")
+                raise Exception(
+                    f"Не удалось загрузить {file_type} для job {job_id}, код ответа: {response.status_code}")
+        except Exception as e:
+            self.logger.error(f"Error downloading {file_type}: {str(e)}")
+            raise
