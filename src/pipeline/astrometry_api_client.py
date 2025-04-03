@@ -1,6 +1,7 @@
 import requests
 import json
 from src.utils.logger import Logger
+import os
 
 
 class AstrometryAPIClient:
@@ -142,7 +143,15 @@ class AstrometryAPIClient:
 
     def download_result_file(self, job_id, file_type, save_path):
         url = f"http://nova.astrometry.net/{file_type}/{job_id}"
+        temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "temp")
+        os.makedirs(temp_dir, exist_ok=True)
+
+        original_filename = os.path.basename(save_path)
+        temp_save_path = os.path.join(temp_dir, original_filename)
+
         self.logger.info(f"Downloading {file_type} from {url}")
+        self.logger.info(f"Original save path: {save_path}")
+        self.logger.info(f"Temporary save path for debugging: {temp_save_path}")
 
         try:
             response = requests.get(url)
@@ -150,6 +159,9 @@ class AstrometryAPIClient:
                 with open(save_path, 'wb') as f:
                     f.write(response.content)
                 self.logger.info(f"Successfully downloaded {file_type} to {save_path}")
+                with open(save_path, 'wb') as f:
+                    f.write(response.content)
+                self.logger.info(f"Also saved to original location: {save_path}")
                 return True
             else:
                 self.logger.error(f"Failed to download {file_type}, status code: {response.status_code}")

@@ -2,12 +2,17 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import threading
 import os
+import time
+
+import numpy as np
 from PIL import Image, ImageTk
 
-from src.pipeline.astrometry_api_client import AstrometryAPIClient
+from src.controllers.processing_controller import ProcessingController
+from src.pipeline.astrometry_processor import AstrometryProcessor
+from src.pipeline.catalog_verification_processor import CatalogVerificationProcessor
+from src.pipeline.sextractor_processor import SExtractorProcessor
+from src.pipeline.comparison_processor import ComparisonProcessor
 from src.pipeline.image_processor import ImageProcessor
-from src.pipeline.astrometry_calibrator import AstrometryCalibrator
-from src.pipeline.object_classifier import ObjectClassifier
 from src.utils.logger import Logger
 
 class AstrometryApp:
@@ -15,13 +20,10 @@ class AstrometryApp:
         self.root = root
         self.root.title("Определение местоположения космического объекта")
         self.api_key = "lyjwakywqahzzjvj"
-        self.client = AstrometryAPIClient(self.api_key)
         self.file_path = None
         self.image_processor = ImageProcessor()
         self.logger = Logger()
-
-        self.object_classifier = ObjectClassifier()
-        self.astrometry_calibrator = AstrometryCalibrator(self.api_key, self.object_classifier)
+        self.controller = ProcessingController()
 
         self._build_ui()
 
@@ -62,8 +64,8 @@ class AstrometryApp:
 
     def _build_info_tab(self, frame):
         info_text = (
-            "🔭 Эта программа выполняет определение координат изображения звёздного неба.\n\n"
-            "📝 В будущем здесь будет инструкция пользователя: как загружать изображения, "
+            "Эта программа выполняет определение местоположения космического объекта.\n\n"
+            "В будущем здесь будет инструкция пользователя: как загружать изображения, "
             "какие форматы поддерживаются, как интерпретировать результат и т.д."
         )
 
@@ -88,68 +90,96 @@ class AstrometryApp:
             return
 
         self.label_status.config(text="Статус: В процессе...", foreground="blue")
-
         threading.Thread(target=self._process_upload, daemon=True).start()
 
     def _process_upload(self):
         try:
-            submission_id = self.client.upload_image(self.file_path)
-            self._update_status("Файл загружен. Ожидание обработки...", "blue")
+            context = {"image_path": self.file_path}
 
-            job_id = self._wait_for_job(submission_id)
-            if not job_id:
-                self._update_status("Ошибка: обработка не завершилась", "red")
-                return
+            astrometry_processor = AstrometryProcessor(self.api_key)
+            sextractor_processor = SExtractorProcessor()
+            comparison_processor = ComparisonProcessor()
+            catalog_verification_processor = CatalogVerificationProcessor()
 
-            self._update_status("Загрузка результатов...", "blue")
-            base_dir = os.path.dirname(self.file_path)
-            base_name = os.path.splitext(os.path.basename(self.file_path))[0]
+            self._update_status("Запуск параллельной обработки...", "blue")
 
-            wcs_path = os.path.join(base_dir, f"{base_name}_wcs.fits")
-            rdls_path = os.path.join(base_dir, f"{base_name}_rdls.rdls")
+            # First run astrometry and sextractor in parallel
+            result = self.controller.run_parallel_processing(
+                context,
+                astrometry_processor,
+                sextractor_processor,
+                comparison_processor
+            )
 
-            self.client.download_result_file(job_id, "wcs_file", wcs_path)
-            self.client.download_result_file(job_id, "rdls_file", rdls_path)
+            # Then verify the unique objects against catalogs
+            self._update_status("Проверка объектов по астрономическим каталогам...", "blue")
+            catalog_verification_processor.handle(result)
 
-            context = {
-                "image_path": self.file_path,
-                "job_id": job_id,
-                "wcs_path": wcs_path,
-                "rdls_path": rdls_path
-            }
-
-            self._update_status("Анализ объектов...", "blue")
-            result = self.object_classifier.handle(context)
-
-            highlighted_path = result.get("highlighted_path")
-            if highlighted_path and os.path.exists(highlighted_path):
-                self._show_image(highlighted_path)
-                unknown_count = result.get("unknown_count", 0)
-                total_objects = result.get("total_objects", 0)
-                self._update_status(f"Обнаружено {unknown_count} неизвестных объектов из {total_objects}", "green")
-            else:
-                self._update_status("Обработка завершена, но изображение недоступно", "orange")
+            self._display_results(result)
 
         except Exception as e:
             self._update_status(f"Ошибка: {str(e)}", "red")
             self.logger.error(f"Error in processing upload: {str(e)}")
 
-    def _wait_for_job(self, subid, timeout=300, interval=5):
-        import time
-        elapsed = 0
-        while elapsed < timeout:
-            status = self.client.get_submission_status(subid)
-            jobs = status.get("jobs", [])
-            for job_id in jobs:
-                if job_id:
-                    job_status = self.client.get_job_status(job_id)
-                    if job_status.get("status") == "success":
-                        return job_id
-                    elif job_status.get("status") == "failure":
-                        raise Exception("Обработка завершилась с ошибкой")
-            time.sleep(interval)
-            elapsed += interval
-        return None
+    def _display_results(self, result):
+        """Display the processing results"""
+        # Show all Astrometry.net objects
+        all_objects_path = result.get("all_objects_path")
+        if all_objects_path and os.path.exists(all_objects_path):
+            self._show_image(all_objects_path)
+            field_center = result.get("field_center", {})
+            field_info = f"Field center: RA={field_center.get('ra_formatted', 'Unknown')}, Dec={field_center.get('dec_formatted', 'Unknown')}"
+            self._update_status(f"Astrometry.net: все обнаруженные объекты (синим)\n{field_info}", "blue")
+            time.sleep(2)
+
+        # Show all SExtractor objects
+        sep_all_objects_path = result.get("sep_all_objects_path")
+        if sep_all_objects_path and os.path.exists(sep_all_objects_path):
+            self._show_image(sep_all_objects_path)
+            sep_count = len(result.get("sep_pixel_coords", []))
+            self._update_status(f"SExtractor: найдено {sep_count} объектов (фиолетовым)", "purple")
+            time.sleep(2)
+
+        # Show unknown objects from astrometry
+        highlighted_path = result.get("highlighted_path")
+        if highlighted_path and os.path.exists(highlighted_path):
+            self._show_image(highlighted_path)
+            unknown_count = result.get("unknown_count", 0)
+            total_objects = result.get("total_objects", 0)
+            self._update_status(f"Astrometry: {unknown_count} неизвестных из {total_objects} (красным)", "red")
+            time.sleep(2)
+
+        # Show objects unique to SExtractor
+        unique_objects_path = result.get("unique_objects_path")
+        if unique_objects_path and os.path.exists(unique_objects_path):
+            self._show_image(unique_objects_path)
+            unique_count = len(result.get("unique_sep_objects", []))
+            self._update_status(f"Объекты только в SExtractor: {unique_count} (зеленым)", "green")
+            time.sleep(2)
+
+        # Show truly unknown objects (not in any catalog)
+        truly_unknown_path = result.get("truly_unknown_path")
+        if truly_unknown_path and os.path.exists(truly_unknown_path):
+            self._show_image(truly_unknown_path)
+
+            # Get coordinates for unknown objects
+            truly_unknown_coords = result.get("truly_unknown_coords", [])
+
+            # Show number of unknown objects
+            count_message = f"Действительно неизвестные объекты: {len(truly_unknown_coords)} (желтым)"
+
+            # Add coordinate details if objects exist
+            if truly_unknown_coords:
+                coord_details = "\nКоординаты объектов:"
+                for i, obj in enumerate(truly_unknown_coords[:3]):  # Show up to 3 objects
+                    coord_details += f"\n{i + 1}. RA={obj['ra_formatted']}, Dec={obj['dec_formatted']}"
+
+                if len(truly_unknown_coords) > 3:
+                    coord_details += f"\n... и еще {len(truly_unknown_coords) - 3} объект(ов)"
+
+                self._update_status(f"{count_message}{coord_details}", "black")
+            else:
+                self._update_status(count_message, "black")
 
     def _update_status(self, text, color):
         self.label_status.config(text=f"Статус: {text}", foreground=color)
