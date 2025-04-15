@@ -1,7 +1,7 @@
 import os
 from src.pipeline.processing_chain import ProcessingChain
 from src.pipeline.astrometry_api_client import AstrometryAPIClient
-from src.utils.logger import Logger
+from src.infrastructure.utils.logger import Logger
 
 class AstrometryProcessor(ProcessingChain):
     def __init__(self, api_key, next_processor=None):

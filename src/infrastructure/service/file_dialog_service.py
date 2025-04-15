@@ -1,20 +1,17 @@
-from src.pipeline.processing_chain import ProcessingChain
-from src.utils.logger import Logger
+import os
 import tkinter as tk
 from tkinter import filedialog
-import os
+from src.domain.interfaces.file_selection_service import IFileSelectionService
+from src.infrastructure.utils.logger import Logger
 
 
-class ImageProcessor(ProcessingChain):
-    def __init__(self, next_processor=None):
-        super().__init__(next_processor)
+class FileDialogService(IFileSelectionService):
+    def __init__(self):
         self.logger = Logger()
 
-    def handle(self, data=None):
+    def select_image(self):
         root = tk.Tk()
         root.withdraw()
-
-        self.logger.info(f"Current log file: {self.logger.get_log_file_path()}")
 
         self.logger.info("Opening file dialog for image selection")
         image_path = filedialog.askopenfilename(

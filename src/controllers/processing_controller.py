@@ -1,5 +1,5 @@
 import threading
-from src.utils.logger import Logger
+from src.infrastructure.utils.logger import Logger
 
 
 class ProcessingController:

@@ -1,8 +1,8 @@
 import os
 import numpy as np
 from src.pipeline.processing_chain import ProcessingChain
-from src.utils.image_highlighter import ImageHighlighter
-from src.utils.logger import Logger
+from src.infrastructure.utils.image_highlighter import ImageHighlighter
+from src.infrastructure.utils.logger import Logger
 
 class ComparisonProcessor(ProcessingChain):
     def __init__(self, next_processor=None):

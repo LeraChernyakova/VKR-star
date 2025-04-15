@@ -2,7 +2,7 @@ import os
 import time
 from src.pipeline.processing_chain import ProcessingChain
 from src.pipeline.astrometry_api_client import AstrometryAPIClient
-from src.utils.logger import Logger
+from src.infrastructure.utils.logger import Logger
 
 
 class AstrometryCalibrator(ProcessingChain):

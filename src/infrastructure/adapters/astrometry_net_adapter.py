@@ -1,10 +1,12 @@
 import requests
 import json
-from src.utils.logger import Logger
 import os
 
+from src.domain.interfaces.astrometry_service import IAstrometryService
+from src.infrastructure.utils.logger import Logger
 
-class AstrometryAPIClient:
+
+class AstrometryNetAdapter(IAstrometryService):
     BASE_URL = "http://nova.astrometry.net/api"
 
     def __init__(self, api_key):
@@ -16,6 +18,7 @@ class AstrometryAPIClient:
     def login(self):
         url = f"{self.BASE_URL}/login"
         payload = {'request-json': json.dumps({"apikey": self.api_key})}
+
         self.logger.info("Logging in to Astrometry.net API")
         self.logger.debug(f"Login URL: {url}")
 
@@ -23,7 +26,6 @@ class AstrometryAPIClient:
             response = requests.post(url, data=payload)
             self.logger.debug(f"Response status: {response.status_code}")
             self.logger.debug(f"Response text: {response.text}")
-
             result = response.json()
 
             if result.get("status") != "success":
@@ -33,6 +35,7 @@ class AstrometryAPIClient:
             self.session = result["session"]
             self.logger.info("Login successful")
             return result
+
         except Exception as e:
             self.logger.error(f"Login error: {str(e)}")
             raise
@@ -82,26 +85,6 @@ class AstrometryAPIClient:
             self.logger.error(f"Upload error: {str(e)}")
             raise
 
-    def get_submission_status(self, subid):
-        url = f"{self.BASE_URL}/submissions/{subid}"
-        self.logger.debug(f"Checking submission status for ID {subid}")
-
-        try:
-            response = requests.get(url)
-            self.logger.debug(f"Submission status response code: {response.status_code}")
-            self.logger.debug(f"Submission status response text: {response.text}")
-
-            try:
-                result = response.json()
-                self.logger.debug(f"Submission status: {result}")
-                return result
-            except json.JSONDecodeError:
-                self.logger.error("JSON decode error from /submissions")
-                raise Exception("Error parsing JSON from /submissions")
-        except Exception as e:
-            self.logger.error(f"Error getting submission status: {str(e)}")
-            raise
-
     def get_job_status(self, job_id):
         url = f"{self.BASE_URL}/jobs/{job_id}"
         self.logger.debug(f"Getting job status for job ID {job_id}")
@@ -113,32 +96,6 @@ class AstrometryAPIClient:
             return result
         except Exception as e:
             self.logger.error(f"Error getting job status: {str(e)}")
-            raise
-
-    def get_job_result(self, job_id):
-        url = f"{self.BASE_URL}/jobs/{job_id}/calibration/"
-        self.logger.info(f"Getting calibration results for job ID {job_id}")
-
-        try:
-            response = requests.get(url)
-            result = response.json()
-            self.logger.debug(f"Job result received: {result}")
-            return result
-        except Exception as e:
-            self.logger.error(f"Error getting job result: {str(e)}")
-            raise
-
-    def get_annotations(self, job_id):
-        url = f"{self.BASE_URL}/jobs/{job_id}/annotations/"
-        self.logger.info(f"Getting annotations for job ID {job_id}")
-
-        try:
-            response = requests.get(url)
-            result = response.json()
-            self.logger.debug(f"Annotations received: {result}")
-            return result
-        except Exception as e:
-            self.logger.error(f"Error getting annotations: {str(e)}")
             raise
 
     def download_result_file(self, job_id, file_type, save_path):

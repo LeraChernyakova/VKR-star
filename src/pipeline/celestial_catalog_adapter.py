@@ -4,7 +4,7 @@ from astropy.time import Time
 from astroquery.vizier import Vizier
 from astroquery.simbad import Simbad
 from astroquery.mpc import MPC
-from src.utils.logger import Logger
+from src.infrastructure.utils.logger import Logger
 
 
 class CelestialCatalogAdapter:

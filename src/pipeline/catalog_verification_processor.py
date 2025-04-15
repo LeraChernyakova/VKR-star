@@ -7,8 +7,8 @@ from astropy.io import fits
 
 from src.pipeline.processing_chain import ProcessingChain
 from src.pipeline.celestial_catalog_adapter import CelestialCatalogAdapter
-from src.utils.image_highlighter import ImageHighlighter
-from src.utils.logger import Logger
+from src.infrastructure.utils.image_highlighter import ImageHighlighter
+from src.infrastructure.utils.logger import Logger
 
 
 class CatalogVerificationProcessor(ProcessingChain):

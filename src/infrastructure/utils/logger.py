@@ -14,7 +14,7 @@ class Logger:
         return cls._instance
 
     def _initialize_logger(self):
-        self.logger = logging.getLogger("AstrometryApp")
+        self.logger = logging.getLogger("AstroApp")
         self.logger.setLevel(logging.DEBUG)
 
         if self.logger.handlers:

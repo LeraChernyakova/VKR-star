@@ -1,10 +1,8 @@
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, messagebox
 import threading
 import os
-import time
 
-import numpy as np
 from PIL import Image, ImageTk
 
 from src.controllers.processing_controller import ProcessingController
@@ -13,7 +11,7 @@ from src.pipeline.catalog_verification_processor import CatalogVerificationProce
 from src.pipeline.sextractor_processor import SExtractorProcessor
 from src.pipeline.comparison_processor import ComparisonProcessor
 from src.pipeline.image_processor import ImageProcessor
-from src.utils.logger import Logger
+from src.infrastructure.utils.logger import Logger
 
 class AstrometryApp:
     def __init__(self, root):
@@ -124,38 +122,38 @@ class AstrometryApp:
     def _display_results(self, result):
         """Display the processing results"""
         # Show all Astrometry.net objects
-        all_objects_path = result.get("all_objects_path")
-        if all_objects_path and os.path.exists(all_objects_path):
-            self._show_image(all_objects_path)
-            field_center = result.get("field_center", {})
-            field_info = f"Field center: RA={field_center.get('ra_formatted', 'Unknown')}, Dec={field_center.get('dec_formatted', 'Unknown')}"
-            self._update_status(f"Astrometry.net: все обнаруженные объекты (синим)\n{field_info}", "blue")
-            time.sleep(2)
+        # all_objects_path = result.get("all_objects_path")
+        #if all_objects_path and os.path.exists(all_objects_path):
+        #    self._show_image(all_objects_path)
+        #    field_center = result.get("field_center", {})
+        #    field_info = f"Field center: RA={field_center.get('ra_formatted', 'Unknown')}, Dec={field_center.get('dec_formatted', 'Unknown')}"
+        #    self._update_status(f"Astrometry.net: все обнаруженные объекты (синим)\n{field_info}", "blue")
+        #    time.sleep(2)
 
         # Show all SExtractor objects
-        sep_all_objects_path = result.get("sep_all_objects_path")
-        if sep_all_objects_path and os.path.exists(sep_all_objects_path):
-            self._show_image(sep_all_objects_path)
-            sep_count = len(result.get("sep_pixel_coords", []))
-            self._update_status(f"SExtractor: найдено {sep_count} объектов (фиолетовым)", "purple")
-            time.sleep(2)
+        # sep_all_objects_path = result.get("sep_all_objects_path")
+        # if sep_all_objects_path and os.path.exists(sep_all_objects_path):
+        #    self._show_image(sep_all_objects_path)
+        #    sep_count = len(result.get("sep_pixel_coords", []))
+        #    self._update_status(f"SExtractor: найдено {sep_count} объектов (фиолетовым)", "purple")
+        #    time.sleep(2)
 
         # Show unknown objects from astrometry
-        highlighted_path = result.get("highlighted_path")
-        if highlighted_path and os.path.exists(highlighted_path):
-            self._show_image(highlighted_path)
-            unknown_count = result.get("unknown_count", 0)
-            total_objects = result.get("total_objects", 0)
-            self._update_status(f"Astrometry: {unknown_count} неизвестных из {total_objects} (красным)", "red")
-            time.sleep(2)
+        # highlighted_path = result.get("highlighted_path")
+        # if highlighted_path and os.path.exists(highlighted_path):
+        #    self._show_image(highlighted_path)
+        #    unknown_count = result.get("unknown_count", 0)
+        #    total_objects = result.get("total_objects", 0)
+        #    self._update_status(f"Astrometry: {unknown_count} неизвестных из {total_objects} (красным)", "red")
+        #    time.sleep(2)
 
         # Show objects unique to SExtractor
-        unique_objects_path = result.get("unique_objects_path")
-        if unique_objects_path and os.path.exists(unique_objects_path):
-            self._show_image(unique_objects_path)
-            unique_count = len(result.get("unique_sep_objects", []))
-            self._update_status(f"Объекты только в SExtractor: {unique_count} (зеленым)", "green")
-            time.sleep(2)
+        # unique_objects_path = result.get("unique_objects_path")
+        # if unique_objects_path and os.path.exists(unique_objects_path):
+        #    self._show_image(unique_objects_path)
+        #    unique_count = len(result.get("unique_sep_objects", []))
+        #    self._update_status(f"Объекты только в SExtractor: {unique_count} (зеленым)", "green")
+        #    time.sleep(2)
 
         # Show truly unknown objects (not in any catalog)
         truly_unknown_path = result.get("truly_unknown_path")

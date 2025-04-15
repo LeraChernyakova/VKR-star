@@ -1,13 +1,12 @@
 from src.pipeline.processing_chain import ProcessingChain
-from src.utils.image_highlighter import ImageHighlighter
+from src.infrastructure.utils.image_highlighter import ImageHighlighter
 from src.pipeline.celestial_catalog_adapter import CelestialCatalogAdapter
-from src.utils.logger import Logger
+from src.infrastructure.utils.logger import Logger
 
 from astropy.io import fits, ascii
 from astropy.wcs import WCS
 import warnings
 from astropy.wcs import FITSFixedWarning
-import numpy as np
 import os
 
 class ObjectClassifier(ProcessingChain):
