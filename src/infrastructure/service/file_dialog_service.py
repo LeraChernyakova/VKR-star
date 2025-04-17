@@ -7,24 +7,25 @@ from src.infrastructure.utils.logger import Logger
 
 class FileDialogService(IFileSelectionService):
     def __init__(self):
+        self.service_name = "FileDialogService"
         self.logger = Logger()
 
     def select_image(self):
         root = tk.Tk()
         root.withdraw()
 
-        self.logger.info("Opening file dialog for image selection")
+        self.logger.info(self.service_name,"Opening file dialog for image selection")
         image_path = filedialog.askopenfilename(
             title="Выберите изображение для обработки",
             filetypes=[
-                ("Image files", "*.jpg *.jpeg *.png *.tif *.tiff *.fits"),
+                ("Image files", "*.jpg *.jpeg *.png"),
                 ("All files", "*.*")
             ]
         )
 
         if image_path and os.path.isfile(image_path):
-            self.logger.info(f"Selected image: {image_path}")
+            self.logger.info(self.service_name,f"Selected image: {image_path}")
             return image_path
         else:
-            self.logger.warning("No file selected or file does not exist")
+            self.logger.warning(self.service_name,"No file selected or file does not exist")
             return None

@@ -1,17 +1,22 @@
-from domain.interfaces.astrometry_service import IAstrometryService
+from astropy.coordinates import SkyCoord
+import astropy.units as u
+from src.domain.interfaces.catalog_service import ICatalogService
+from src.infrastructure.utils.logger import Logger
 
+class CelestialCatalogAdapter(ICatalogService):
+    def __init__(self, observer_location="500"):
+        self.service_name = "CelestialCatalogAdapter"
+        self.logger = Logger()
+        self.logger.info(self.service_name,"CelestialCatalogAdapter initialized")
 
-class AstrometryNetAdapter(IAstrometryService):
-    def __init__(self, api_key):
-        self.api_key = api_key
-        self.client = AstrometryAPIClient(api_key)
+    def query_by_coordinates(self, ra, dec, radius_arcsec=10):
+        coord = SkyCoord(ra=ra * u.deg, dec=dec * u.deg, frame="icrs")
+        radius = radius_arcsec * u.arcsec
+        results = []
 
-    def calibrate_image(self, image_path):
-        # Реализация взаимодействия с Astrometry.net
-        submission_id = self.client.upload_image(image_path)
-        job_id = self._wait_for_job(submission_id)
+        self._query_standard_catalogs(coord, radius, results)
+        self._check_solar_system_bodies(coord, radius * 2, results)
+        self._query_mpc(coord, radius, results)
 
-        # Загрузка WCS файлов и т.д.
-        # ...
-
-        return wcs_data
+        self.logger.info(self.service_name,f"Query complete. Found objects in {len(results)} catalogs/sources")
+        return results

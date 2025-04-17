@@ -1,19 +1,39 @@
 class AnalysisController:
-    def __init__(self, find_unknown_objects_use_case):
-        self.find_unknown_objects = find_unknown_objects_use_case
+    def __init__(self, select_image_use_case, calibrate_image_use_case,
+                 detect_objects_use_case, verify_objects_use_case, process_image_use_case):
+        self.select_image_use_case = select_image_use_case
+        self.calibrate_image_use_case = calibrate_image_use_case
+        self.detect_objects_use_case = detect_objects_use_case
+        self.verify_objects_use_case = verify_objects_use_case
+        self.process_image_use_case = process_image_use_case
+
+    def select_image(self):
+        return self.select_image_use_case.execute()
 
     def analyze_image(self, image_path):
         try:
-            unknown_objects = self.find_unknown_objects.execute(image_path)
+            result = self.process_image_use_case.execute(
+                image_path,
+                self.calibrate_image_use_case,
+                self.detect_objects_use_case,
+                self.verify_objects_use_case
+            )
 
-            # Подготовка результата для отображения
-            result = {
-                "image_path": image_path,
-                "unknown_objects": unknown_objects,
-                "count": len(unknown_objects)
-            }
+            if "error" in result:
+                return result
+
+            if "wcs_path" not in result or "pixel_coords" not in result:
+                return {"error": "Не удалось получить необходимые данные из изображения"}
+
+            verification_result = self.verify_objects_use_case.execute(
+                result["image_path"],
+                result["wcs_path"],
+                result["pixel_coords"]
+            )
+
+            result.update(verification_result)
 
             return result
+
         except Exception as e:
-            # Обработка ошибок
             return {"error": str(e)}

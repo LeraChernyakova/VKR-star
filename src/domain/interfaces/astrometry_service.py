@@ -7,15 +7,15 @@ class IAstrometryService(ABC):
         pass
 
     @abstractmethod
-    def login(self):
-        pass
-
-    @abstractmethod
     def upload_image(self, image_path):
         pass
 
     @abstractmethod
     def get_job_status(self, job_id):
+        pass
+
+    @abstractmethod
+    def calibrate_image(self, image_path):
         pass
 
     @abstractmethod

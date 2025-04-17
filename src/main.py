@@ -1,34 +1,49 @@
-from infrastructure.adapters.astrometry_net_adapter import AstrometryNetAdapter
-from infrastructure.adapters.celestial_catalog_adapter import CelestialCatalogAdapter
-from infrastructure.adapters.sep_detection_adapter import SepDetectionAdapter
-from application.use_cases.find_unknown_objects import FindUnknownObjectsUseCase
-from presentation.controllers.analysis_controller import AnalysisController
-from presentation.views.analysis_view import AnalysisView
-from infrastructure.utils.logger import LoggerFactory
+from src.application.use_cases.detect_objects_use_case import DetectObjectsUseCase
+from src.infrastructure.adapters.astrometry_net_adapter import AstrometryNetAdapter
+from src.infrastructure.adapters.celestial_catalog_adapter import CelestialCatalogAdapter
+from src.infrastructure.adapters.sep_detection_adapter import SepDetectionAdapter
+from src.infrastructure.service.file_dialog_service import FileDialogService
+from src.infrastructure.service.parallel_processing_service import ParallelProcessingService
+from src.infrastructure.utils.logger import Logger
 
+from src.application.use_cases.select_image_use_case import SelectImageUseCase
+from src.application.use_cases.calibrate_image_use_case import CalibrateImageUseCase
+from src.application.use_cases.verify_unknown_objects_use_case import VerifyUnknownObjectsUseCase
+from src.application.use_cases.process_image_use_case import ProcessImageUseCase
+
+from src.presentation.controllers.analysis_controller import AnalysisController
+from src.presentation.views.astrometry_app import AstrometryApp
+
+import tkinter as tk
 
 def main():
-    # Создание logger
-    logger = LoggerFactory.create_logger()
+    logger = Logger()
+    logger.info("main","Запуск приложения")
 
-    # Настройка зависимостей
-    api_key = "YOUR_API_KEY"
+    api_key = "lyjwakywqahzzjvj"
     astrometry_service = AstrometryNetAdapter(api_key)
-    detection_service = SepDetectionAdapter()
     catalog_service = CelestialCatalogAdapter()
+    detection_service = SepDetectionAdapter()
+    file_selection_service = FileDialogService()
+    parallel_service = ParallelProcessingService()
 
-    # Настройка Use Case
-    find_unknown_objects_use_case = FindUnknownObjectsUseCase(
-        astrometry_service, detection_service, catalog_service
+    select_image_use_case = SelectImageUseCase(file_selection_service)
+    calibrate_image_use_case = CalibrateImageUseCase(astrometry_service)
+    detect_objects_use_case = DetectObjectsUseCase(detection_service)
+    verify_objects_use_case = VerifyUnknownObjectsUseCase(catalog_service)
+    process_image_use_case = ProcessImageUseCase(parallel_service)
+
+    controller = AnalysisController(
+        select_image_use_case,
+        calibrate_image_use_case,
+        detect_objects_use_case,
+        verify_objects_use_case,
+        process_image_use_case
     )
 
-    # Настройка контроллера
-    controller = AnalysisController(find_unknown_objects_use_case)
-
-    # Настройка GUI
-    view = AnalysisView(controller)
-    view.run()
-
+    root = tk.Tk()
+    AstrometryApp(root, controller)
+    root.mainloop()
 
 if __name__ == "__main__":
     main()

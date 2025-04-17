@@ -7,8 +7,9 @@ from src.infrastructure.utils.logger import Logger
 
 class SepDetectionAdapter(IObjectDetectionService):
     def __init__(self):
+        self.service_name = "SepDetectionAdapter"
         self.logger = Logger()
-        self.logger.info("SepDetectionAdapter initialized")
+        self.logger.info(self.service_name,"SepDetectionAdapter initialized")
 
     def detect_objects(self, image_path):
         try:
@@ -30,7 +31,7 @@ class SepDetectionAdapter(IObjectDetectionService):
             bright_objects = objects[bright_objects_mask]
             bright_flux = flux[bright_objects_mask]
 
-            self.logger.info(f"Found {len(objects)} initial objects, kept {len(bright_objects)} after flux filtering")
+            self.logger.info(self.service_name,f"Found {len(objects)} initial objects, kept {len(bright_objects)} after flux filtering")
 
             return {
                 "objects": bright_objects,
@@ -39,5 +40,5 @@ class SepDetectionAdapter(IObjectDetectionService):
             }
 
         except Exception as e:
-            self.logger.error(f"Error in SEP processing: {str(e)}")
+            self.logger.error(self.service_name,f"Error in SEP processing: {str(e)}")
             return {"error": str(e)}

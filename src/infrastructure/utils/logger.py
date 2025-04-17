@@ -22,8 +22,9 @@ class Logger:
 
         current_file = os.path.abspath(__file__)
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file)))
+        parent_dir = os.path.dirname(project_root)
 
-        logs_dir = os.path.join(project_root, 'logs')
+        logs_dir = os.path.join(parent_dir, 'logs')
         os.makedirs(logs_dir, exist_ok=True)
 
         self.logs_dir = logs_dir
@@ -35,7 +36,7 @@ class Logger:
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setLevel(logging.INFO)
 
-        formatter = logging.Formatter('[%(asctime)s] [%(levelname)s] %(message)s')
+        formatter = logging.Formatter('[%(asctime)s] [%(levelname)s] [%(service)s] %(message)s')
         file_handler.setFormatter(formatter)
         console_handler.setFormatter(formatter)
 
@@ -44,25 +45,25 @@ class Logger:
 
         self.log_file = log_file
 
-        self.logger.info(f"Logger initialized")
-        self.logger.info(f"Project root: {project_root}")
-        self.logger.info(f"Logs directory: {logs_dir}")
-        self.logger.info(f"Current log file: {log_file}")
+        self.logger.info("Logger initialized", extra={'service': 'Logger'})
+        self.logger.info(f"Project root: {project_root}", extra={'service': 'Logger'})
+        self.logger.info(f"Logs directory: {logs_dir}", extra={'service': 'Logger'})
+        self.logger.info(f"Current log file: {log_file}", extra={'service': 'Logger'})
 
-    def debug(self, message):
-        self.logger.debug(message)
+    def debug(self, service, message):
+        self.logger.debug(message, extra={'service': service})
 
-    def info(self, message):
-        self.logger.info(message)
+    def info(self, service, message):
+        self.logger.info(message, extra={'service': service})
 
-    def warning(self, message):
-        self.logger.warning(message)
+    def warning(self, service, message):
+        self.logger.warning(message, extra={'service': service})
 
-    def error(self, message):
-        self.logger.error(message)
+    def error(self, service, message):
+        self.logger.error(message, extra={'service': service})
 
-    def critical(self, message):
-        self.logger.critical(message)
+    def critical(self, service, message):
+        self.logger.critical(message, extra={'service': service})
 
     def get_log_file_path(self):
         return self.log_file
