@@ -1,0 +1,8 @@
+[report]
+show_missing = True
+skip_covered = False
+
+[html]
+directory = htmlcov
+title = Coverage Report
+show_contexts = True
