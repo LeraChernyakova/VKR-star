@@ -31,8 +31,6 @@ class SepDetectionAdapter(IObjectDetectionService):
             bright_objects = objects[bright_objects_mask]
             bright_flux = flux[bright_objects_mask]
 
-            self.logger.info(self.service_name,f"Found {len(objects)} initial objects, kept {len(bright_objects)} after flux filtering")
-
             return {
                 "objects": bright_objects,
                 "pixel_coords": [(obj['x'], obj['y']) for obj in bright_objects],

@@ -26,7 +26,6 @@ class Logger:
 
         logs_dir = os.path.join(parent_dir, 'logs')
         os.makedirs(logs_dir, exist_ok=True)
-
         self.logs_dir = logs_dir
 
         log_file = os.path.join(logs_dir, f"app_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
@@ -45,11 +44,6 @@ class Logger:
 
         self.log_file = log_file
 
-        self.logger.info("Logger initialized", extra={'service': 'Logger'})
-        self.logger.info(f"Project root: {project_root}", extra={'service': 'Logger'})
-        self.logger.info(f"Logs directory: {logs_dir}", extra={'service': 'Logger'})
-        self.logger.info(f"Current log file: {log_file}", extra={'service': 'Logger'})
-
     def debug(self, service, message):
         self.logger.debug(message, extra={'service': service})
 
@@ -61,9 +55,6 @@ class Logger:
 
     def error(self, service, message):
         self.logger.error(message, extra={'service': service})
-
-    def critical(self, service, message):
-        self.logger.critical(message, extra={'service': service})
 
     def get_log_file_path(self):
         return self.log_file

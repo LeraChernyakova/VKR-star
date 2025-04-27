@@ -23,7 +23,7 @@ class AnalysisController:
                 return result
 
             if "wcs_path" not in result or "pixel_coords" not in result:
-                return {"error": "Не удалось получить необходимые данные из изображения"}
+                return {"error": "failed get necessary data from image"}
 
             verification_result = self.verify_objects_use_case.execute(
                 result["image_path"],

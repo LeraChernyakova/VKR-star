@@ -14,7 +14,6 @@ class FileDialogService(IFileSelectionService):
         root = tk.Tk()
         root.withdraw()
 
-        self.logger.info(self.service_name,"Opening file dialog for image selection")
         image_path = filedialog.askopenfilename(
             title="Выберите изображение для обработки",
             filetypes=[
@@ -24,7 +23,6 @@ class FileDialogService(IFileSelectionService):
         )
 
         if image_path and os.path.isfile(image_path):
-            self.logger.info(self.service_name,f"Selected image: {image_path}")
             return image_path
         else:
             self.logger.warning(self.service_name,"No file selected or file does not exist")

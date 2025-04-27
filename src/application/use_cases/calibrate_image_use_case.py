@@ -9,14 +9,12 @@ class CalibrateImageUseCase:
 
     def execute(self, image_path):
         try:
-            self.logger.info(self.service_name,f"Astrometry calibrate start")
             result = self.astrometry_service.calibrate_image(image_path)
 
             if result is None:
                 self.logger.error(self.service_name,"Image calibration failed")
                 return None
 
-            self.logger.info(self.service_name,f"Image calibration success")
             return result
 
         except Exception as e:
@@ -25,5 +23,5 @@ class CalibrateImageUseCase:
 
     def process(self, data):
         if "image_path" not in data:
-            return {"error": "The path to the image is missing"}
+            return {"error": "path to image missing"}
         return self.execute(data["image_path"])

@@ -95,7 +95,7 @@ class AstrometryApp:
 
         except Exception as e:
             self._update_status(f"Ошибка: {str(e)}", "red")
-            self.logger.error(f"Ошибка при обработке: {str(e)}")
+            self.logger.error(f"Error while processing: {str(e)}")
 
     def _display_results(self, result):
         visualization_path = result.get("visualization_path")
@@ -131,4 +131,4 @@ class AstrometryApp:
             self.image_preview.configure(image=photo)
             self.image_preview.image = photo
         except Exception as e:
-            self.logger.error(f"Ошибка отображения изображения: {str(e)}")
+            self.logger.error(f"Image display error: {str(e)}")

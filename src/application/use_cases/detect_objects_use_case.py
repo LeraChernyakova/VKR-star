@@ -8,21 +8,19 @@ class DetectObjectsUseCase:
 
     def execute(self, image_path):
         try:
-            self.logger.info(self.service_name,f"Запуск обнаружения объектов на изображении: {image_path}")
             result = self.detection_service.detect_objects(image_path)
 
             if "error" in result:
-                self.logger.error(self.service_name,f"Ошибка при обнаружении объектов: {result['error']}")
+                self.logger.error(self.service_name,f"Error while detect objects: {result['error']}")
                 return result
 
-            self.logger.info(self.service_name,f"Обнаружено объектов: {len(result.get('pixel_coords', []))}")
             return result
 
         except Exception as e:
-            self.logger.error(self.service_name,f"Ошибка при обнаружении объектов: {str(e)}")
+            self.logger.error(self.service_name,f"Error while detect objects: {str(e)}")
             return {"error": str(e)}
 
     def process(self, data):
         if "image_path" not in data:
-            return {"error": "Отсутствует путь к изображению"}
+            return {"error": "path to image missing"}
         return self.execute(data["image_path"])

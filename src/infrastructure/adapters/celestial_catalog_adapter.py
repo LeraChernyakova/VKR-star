@@ -1,3 +1,5 @@
+import time
+
 from astropy.coordinates import SkyCoord, get_body, solar_system_ephemeris
 import astropy.units as u
 from astropy.time import Time
@@ -23,35 +25,159 @@ class CelestialCatalogAdapter(ICatalogService):
         self.solar_system_bodies = ['mercury', 'venus', 'mars', 'jupiter',
                                     'saturn', 'uranus', 'neptune', 'pluto']
 
-    def query_by_coordinates(self, ra, dec, radius_arcsec=10):
-        return self.query_all(ra, dec, radius_arcsec)
+        self.cache = {}
+        self.cache_expiry = 3600
+        self.cache_timestamp = time.time()
 
-    def query_all(self, ra, dec, radius_arcsec=10):
-        """
-        Запрашивает информацию по всем каталогам для указанных координат
-        Возвращает список найденных объектов в формате [(catalog_name, data), ...]
-        """
+    def query_by_coordinates(self, ra, dec, radius_arcsec=10):
+        cache_key = f"{ra:.5f}_{dec:.5f}_{radius_arcsec}"
+        if cache_key in self.cache:
+            self.logger.debug(self.service_name, f"Используем кешированный результат для {cache_key}")
+            return self.cache[cache_key]
+
         coord = SkyCoord(ra=ra * u.deg, dec=dec * u.deg, frame="icrs")
         radius = radius_arcsec * u.arcsec
         results = []
 
-        # Запрос стандартных каталогов
         self._query_standard_catalogs(coord, radius, results)
 
-        # Проверка на наличие тел солнечной системы
         self._check_solar_system_bodies(coord, radius * 2, results)
 
-        # Запрос в Minor Planet Center на наличие астероидов и комет
         self._query_mpc(coord, radius, results)
 
-        self.logger.info(self.service_name, f"Найдено {len(results)} объектов в каталогах")
+        self.cache[cache_key] = results
+
+        current_time = time.time()
+        if current_time - self.cache_timestamp > self.cache_expiry:
+            self.cache = {}
+            self.cache_timestamp = current_time
+
         return results
 
-    def _query_standard_catalogs(self, coord, radius, results):
-        """Поиск объекта в стандартных звездных каталогах"""
-        # Запрос Gaia DR3
+    def query_region(self, center_ra, center_dec, radius_deg=0.5):
+        coord = SkyCoord(ra=center_ra * u.deg, dec=center_dec * u.deg, frame="icrs")
+        radius = radius_deg * u.deg
+
+        results_map = {}
+
         try:
-            self.logger.debug(self.service_name, "Запрос каталога Gaia DR3")
+            gaia_results = self.vizier.query_region(coord, radius=radius, catalog="I/355/gaiadr3")
+
+            if gaia_results and len(gaia_results) > 0:
+                self.logger.info(self.service_name, f"Найдено {len(gaia_results[0])} объектов Gaia в области")
+                for row in gaia_results[0]:
+                    ra = float(row['_RAJ2000'])
+                    dec = float(row['_DEJ2000'])
+                    key = (ra, dec)
+                    if key in results_map:
+                        results_map[key].append(("gaia", row))
+                    else:
+                        results_map[key] = [("gaia", row)]
+            else:
+                self.logger.debug(self.service_name, "Объектов Gaia в области не найдено")
+        except Exception as e:
+            self.logger.error(self.service_name, f"Ошибка запроса каталога Gaia: {e}")
+
+        try:
+            usno_results = self.vizier.query_region(coord, radius=radius, catalog="I/284/out")
+
+            if usno_results and len(usno_results) > 0:
+                for row in usno_results[0]:
+                    ra = float(row['_RAJ2000'])
+                    dec = float(row['_DEJ2000'])
+                    key = (ra, dec)
+                    if key in results_map:
+                        results_map[key].append(("usno", row))
+                    else:
+                        results_map[key] = [("usno", row)]
+            else:
+                self.logger.debug(self.service_name, "Объектов USNO в области не найдено")
+        except Exception as e:
+            self.logger.error(self.service_name, f"Ошибка запроса каталога USNO: {e}")
+
+        try:
+            simbad_results = self.simbad.query_region(coord, radius=radius)
+
+            if simbad_results and len(simbad_results) > 0:
+                self.logger.info(self.service_name, f"Найдено {len(simbad_results)} объектов SIMBAD в области")
+                for row in simbad_results:
+                    try:
+                        if 'RA' in row.colnames and 'DEC' in row.colnames:
+                            simbad_coord = SkyCoord(ra=row['RA'], dec=row['DEC'], unit=(u.hourangle, u.deg))
+                            ra = float(simbad_coord.ra.deg)
+                            dec = float(simbad_coord.dec.deg)
+                            key = (ra, dec)
+                            if key in results_map:
+                                results_map[key].append(("simbad", row))
+                            else:
+                                results_map[key] = [("simbad", row)]
+                    except Exception as inner_e:
+                        self.logger.warning(self.service_name, f"Ошибка обработки данных SIMBAD: {inner_e}")
+            else:
+                self.logger.debug(self.service_name, "Объектов SIMBAD в области не найдено")
+        except Exception as e:
+            self.logger.error(self.service_name, f"Ошибка запроса базы SIMBAD: {e}")
+
+        try:
+            self.logger.debug(self.service_name, "Проверка астероидов в области")
+            if hasattr(MPC, 'query_objects_in_sky'):
+                mpc_table = MPC.query_objects_in_sky(
+                    coord.ra.deg, coord.dec.deg,
+                    radius=radius_deg,
+                    limit=100
+                )
+
+                if mpc_table and len(mpc_table) > 0:
+                    for row in mpc_table:
+                        ra = float(row['ra'])
+                        dec = float(row['dec'])
+                        key = (ra, dec)
+                        if key in results_map:
+                            results_map[key].append(("mpc_asteroids", row))
+                        else:
+                            results_map[key] = [("mpc_asteroids", row)]
+            else:
+                self.logger.warning(self.service_name, "Метод query_objects_in_sky в MPC не доступен")
+        except Exception as e:
+            self.logger.warning(self.service_name, f"Ошибка запроса MPC по астероидам: {e}")
+
+        try:
+            self.logger.debug(self.service_name, "Проверка тел Солнечной системы")
+
+            try:
+                import jplephem
+                has_jplephem = True
+            except ImportError:
+                has_jplephem = False
+                self.logger.warning(self.service_name,
+                                    "Пакет jplephem не установлен, пропускаем проверку тел Солнечной системы")
+
+            if has_jplephem:
+                current_time = Time.now()
+                with solar_system_ephemeris.set('jpl'):
+                    for body in self.solar_system_bodies:
+                        try:
+                            body_coord = get_body(body, current_time, self.observer_location)
+                            separation = coord.separation(body_coord)
+
+                            if separation < radius:
+                                ra = float(body_coord.ra.deg)
+                                dec = float(body_coord.dec.deg)
+                                key = (ra, dec)
+                                if key in results_map:
+                                    results_map[key].append(("solar_system", {"body": body}))
+                                else:
+                                    results_map[key] = [("solar_system", {"body": body})]
+                        except Exception as e:
+                            self.logger.warning(self.service_name, f"Ошибка при проверке тела {body}: {e}")
+        except Exception as e:
+            self.logger.error(self.service_name, f"Ошибка при проверке тел Солнечной системы: {e}")
+
+        self.logger.info(self.service_name, f"Всего найдено объектов в области: {len(results_map)}")
+        return results_map
+
+    def _query_standard_catalogs(self, coord, radius, results):
+        try:
             gaia = self.vizier.query_region(coord, radius=radius, catalog="I/355/gaiadr3")
             if gaia and len(gaia) > 0 and len(gaia[0]) > 0:
                 self.logger.info(self.service_name, f"Найдено {len(gaia[0])} совпадений в каталоге Gaia")
@@ -61,7 +187,6 @@ class CelestialCatalogAdapter(ICatalogService):
         except Exception as e:
             self.logger.error(self.service_name, f"Ошибка запроса каталога Gaia: {e}")
 
-        # Запрос USNO-B1.0 (для более слабых звезд)
         try:
             self.logger.debug(self.service_name, "Запрос каталога USNO-B1.0")
             usno = self.vizier.query_region(coord, radius=radius, catalog="I/284/out")
@@ -73,7 +198,6 @@ class CelestialCatalogAdapter(ICatalogService):
         except Exception as e:
             self.logger.error(self.service_name, f"Ошибка запроса каталога USNO: {e}")
 
-        # Запрос SIMBAD для нестеллярных объектов
         try:
             self.logger.debug(self.service_name, "Запрос базы данных SIMBAD")
             simbad = self.simbad.query_region(coord, radius=radius)
@@ -86,15 +210,11 @@ class CelestialCatalogAdapter(ICatalogService):
             self.logger.error(self.service_name, f"Ошибка запроса базы SIMBAD: {e}")
 
     def _check_solar_system_bodies(self, coord, radius, results):
-        """Проверка на совпадение с телами солнечной системы"""
         try:
-            # Получаем текущее время
             current_time = Time.now()
             self.logger.debug(self.service_name, f"Проверка тел солнечной системы на момент: {current_time}")
 
-            # Используем JPL эфемериды для большей точности
             with solar_system_ephemeris.set('jpl'):
-                # Проверяем каждое крупное тело солнечной системы
                 for body_name in self.solar_system_bodies:
                     try:
                         body_coord = get_body(body_name, current_time)
@@ -117,14 +237,11 @@ class CelestialCatalogAdapter(ICatalogService):
             self.logger.error(self.service_name, f"Ошибка при проверке тел солнечной системы: {e}")
 
     def _query_mpc(self, coord, radius, results):
-        """Запрос в Minor Planet Center для поиска астероидов и комет"""
         try:
             self.logger.debug(self.service_name, "Запрос в Minor Planet Center")
 
-            # Конвертация радиуса в градусы для запроса MPC
             radius_deg = radius.to(u.deg).value
 
-            # Запрос MPC на наличие астероидов
             try:
                 mpc_table = MPC.query_objects_in_sky(
                     coord.ra.deg, coord.dec.deg,
@@ -140,7 +257,6 @@ class CelestialCatalogAdapter(ICatalogService):
             except Exception as e:
                 self.logger.warning(self.service_name, f"Ошибка запроса MPC по астероидам: {e}")
 
-            # Также проверяем кометы
             try:
                 comet_table = MPC.query_objects_in_comet_groups(
                     coord.ra.deg, coord.dec.deg,
@@ -158,3 +274,4 @@ class CelestialCatalogAdapter(ICatalogService):
 
         except Exception as e:
             self.logger.error(self.service_name, f"Ошибка запроса Minor Planet Center: {e}")
+
