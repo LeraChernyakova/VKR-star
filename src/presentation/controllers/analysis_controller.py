@@ -1,3 +1,8 @@
+import os
+
+from src.infrastructure.utils.image_highlighter import ImageHighlighter
+from src.infrastructure.service.object_comparison_service import ObjectComparisonService
+
 class AnalysisController:
     def __init__(self, select_image_use_case, calibrate_image_use_case,
                  detect_objects_use_case, verify_objects_use_case, process_image_use_case):
@@ -15,23 +20,25 @@ class AnalysisController:
             result = self.process_image_use_case.execute(
                 image_path,
                 self.calibrate_image_use_case,
-                self.detect_objects_use_case,
-                self.verify_objects_use_case
+                self.detect_objects_use_case
             )
 
-            if "error" in result:
-                return result
+            sep_result = result.get("detection", {})
+            astrometry_result = result.get("astrometry", {})
 
-            if "wcs_path" not in result or "pixel_coords" not in result:
-                return {"error": "failed get necessary data from image"}
+            sep_coords = sep_result.get("pixel_coords", [])
+            astro_coords = astrometry_result.get("pixel_coords", [])
 
-            verification_result = self.verify_objects_use_case.execute(
-                result["image_path"],
-                result["wcs_path"],
-                result["pixel_coords"]
-            )
+            comparison_service = ObjectComparisonService()
+            unique_coords = comparison_service.find_unique_objects(sep_coords, astro_coords, match_threshold=10)
 
-            result.update(verification_result)
+            output_dir = r"F:\ETU\VKR\repo\VKR-star\temp"
+            os.makedirs(output_dir, exist_ok=True)
+            base_name = os.path.splitext(os.path.basename(image_path))[0]
+            output_path = os.path.join(output_dir, f"{base_name}_unique_sep.png")
+            highlighter = ImageHighlighter(image_path)
+            highlighter.highlight_points(unique_coords, radius=10, color="blue")
+            highlighter.save(output_path)
 
             return result
 

@@ -21,22 +21,7 @@ class ProcessImageUseCase:
                 initial_data, processors
             )
 
-            combined_data = initial_data.copy()
-            for result_key, result_data in results.items():
-                if isinstance(result_data, dict):
-                    for key, value in result_data.items():
-                        combined_data[key] = value
-
-            detected_objects = combined_data.get("pixel_coords", [])
-
-            reference_objects = []
-            if "astrometry" in results and isinstance(results["astrometry"], dict):
-                # Если в результатах калибровки есть ключ с координатами эталонных объектов
-                reference_objects = results["astrometry"].get("reference_stars", [])
-
-            final_result = self.comparison_service.process(combined_data)
-
-            return final_result
+            return results
 
         except Exception as e:
             self.logger.error(self.service_name,"Error in image processing: {str(e)}")
