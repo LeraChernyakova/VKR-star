@@ -31,7 +31,6 @@ class AstrometryNetAdapter(IAstrometryService):
 
             rdls_hdul = job.rdls_file()
             data = rdls_hdul[1].data
-
             known_mask = data['ref_id'] != -1
             ra_known = data['RA'][known_mask]
             dec_known = data['DEC'][known_mask]

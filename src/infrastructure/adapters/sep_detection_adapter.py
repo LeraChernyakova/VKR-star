@@ -32,9 +32,20 @@ class SepDetectionAdapter(IObjectDetectionService):
             bright_flux = flux[bright_objects_mask]
 
             return {
-                "pixel_coords": [(obj['x'], obj['y']) for obj in bright_objects]
+                "pixel_coords": [
+                    {
+                        "x": obj['x'],
+                        "y": obj['y'],
+                        "flux": float(f),
+                        "a": float(obj['a']),
+                        "b": float(obj['b']),
+                        "theta": float(obj['theta']),
+                        "npix": int(obj['npix']),
+                        "flag": int(obj['flag'])
+                    }
+                    for obj, f in zip(bright_objects, flux[bright_objects_mask])
+                ]
             }
-
         except Exception as e:
             self.logger.error(self.service_name,f"Error in SEP processing: {str(e)}")
             return {"error": str(e)}

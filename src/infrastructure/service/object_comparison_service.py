@@ -9,17 +9,18 @@ class ObjectComparisonService(IObjectComparisonService):
         self.logger = Logger()
 
     def find_unique_objects(self, detected_objects, reference_objects, match_threshold=10):
-        detected_coords = np.array(detected_objects)
-        reference_coords = np.array(reference_objects) if reference_objects else np.array([])
-
         unique_objects = []
 
-        for x, y in detected_coords:
+        reference_coords = np.array(reference_objects) if reference_objects else np.array([])
+
+        for obj in detected_objects:
+            x, y = obj['x'], obj['y']
+
             if len(reference_coords) > 0:
                 distances = np.sqrt((reference_coords[:, 0] - x) ** 2 + (reference_coords[:, 1] - y) ** 2)
                 if np.min(distances) > match_threshold:
-                    unique_objects.append((x, y))
+                    unique_objects.append(obj)
             else:
-                unique_objects.append((x, y))
+                unique_objects.append(obj)
 
         return unique_objects

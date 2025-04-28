@@ -33,6 +33,8 @@ class AnalysisController:
             comparison_service = ObjectComparisonService()
             unique_coords = comparison_service.find_unique_objects(sep_coords, astro_coords, match_threshold=10)
 
+            print(unique_coords)
+
             result = self.verify_objects_use_case.execute(image_path, unique_coords, wcs)
 
             return result

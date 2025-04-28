@@ -95,7 +95,7 @@ class AstrometryApp:
 
         except Exception as e:
             self._update_status(f"Ошибка: {str(e)}", "red")
-            self.logger.error(f"Error while processing: {str(e)}")
+            self.logger.error("AstrometryApp", f"Error while processing: {str(e)}")
 
     def _display_results(self, result):
         visualization_path = result.get("visualization_path")
