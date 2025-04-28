@@ -28,17 +28,12 @@ class AnalysisController:
 
             sep_coords = sep_result.get("pixel_coords", [])
             astro_coords = astrometry_result.get("pixel_coords", [])
+            wcs = astrometry_result.get("wcs")
 
             comparison_service = ObjectComparisonService()
             unique_coords = comparison_service.find_unique_objects(sep_coords, astro_coords, match_threshold=10)
 
-            output_dir = r"F:\ETU\VKR\repo\VKR-star\temp"
-            os.makedirs(output_dir, exist_ok=True)
-            base_name = os.path.splitext(os.path.basename(image_path))[0]
-            output_path = os.path.join(output_dir, f"{base_name}_unique_sep.png")
-            highlighter = ImageHighlighter(image_path)
-            highlighter.highlight_points(unique_coords, radius=10, color="blue")
-            highlighter.save(output_path)
+            result = self.verify_objects_use_case.execute(image_path, unique_coords, wcs)
 
             return result
 

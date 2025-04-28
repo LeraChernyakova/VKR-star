@@ -41,17 +41,11 @@ class AstrometryNetAdapter(IAstrometryService):
             x_pix, y_pix = wcs.all_world2pix(ra_known, dec_known, 0)
             pixel_coords = list(zip(x_pix, y_pix))
 
-            output_dir = r"F:\ETU\VKR\repo\VKR-star\temp"
-            os.makedirs(output_dir, exist_ok=True)
-            base_name = os.path.splitext(os.path.basename(image_path))[0]
-            output_path = os.path.join(output_dir, f"{base_name}_known_highlighted.png")
-            highlighter = ImageHighlighter(image_path)
-            highlighter.highlight_points(pixel_coords, radius=10, color="green")
-            highlighter.save(output_path)
-
             return {
-                "pixel_coords": pixel_coords
+                "pixel_coords": pixel_coords,
+                "wcs": wcs
             }
+
         except Exception as e:
             self.logger.error(self.service_name, f"Ошибка калибровки: {e}")
             return None
