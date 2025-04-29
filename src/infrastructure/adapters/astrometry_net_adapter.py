@@ -3,6 +3,8 @@ from astropy.wcs import WCS
 
 from src.domain.interfaces.astrometry_service import IAstrometryService
 from src.infrastructure.utils.logger import Logger
+from PIL import Image
+
 
 class AstrometryNetAdapter(IAstrometryService):
     def __init__(self, api_key):

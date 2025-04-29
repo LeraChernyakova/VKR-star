@@ -94,10 +94,19 @@ class CelestialCatalogAdapter(ICatalogService):
                 self.logger.error(self.service_name, f"Ошибка запроса MPC: {e}")
                 return "mpc", []
 
+        def query_ps1():
+            try:
+                res = self.vizier.query_region(coord, radius=radius, catalog="II/349/ps1")
+                return "ps1", _process_vizier_results(res)
+            except Exception as e:
+                self.logger.error(self.service_name, f"Ошибка запроса PS1: {e}")
+                return "ps1", []
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             futures = [
                 executor.submit(query_gaia),
                 executor.submit(query_usno),
+                executor.submit(query_ps1),
                 executor.submit(query_simbad),
                 executor.submit(query_asteroids)
             ]
