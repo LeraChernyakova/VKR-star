@@ -33,11 +33,23 @@ class AnalysisController:
             comparison_service = ObjectComparisonService()
             unique_coords = comparison_service.find_unique_objects(sep_coords, astro_coords, match_threshold=10)
 
-            print(unique_coords)
+            verify = self.verify_objects_use_case.execute(
+                image_path, unique_coords, wcs
+            )
 
-            result = self.verify_objects_use_case.execute(image_path, unique_coords, wcs)
+            unknown = verify.get("unknown_objects", [])
+            points = [(o.get("x"), o.get("y")) for o in unknown]
 
-            return result
+            highlighter = ImageHighlighter(image_path)
+            highlighter.highlight_points(points, radius=8, color="red")
+            base, ext = os.path.splitext(image_path)
+            vis_path = f"{base}_highlighted{ext}"
+            highlighter.save(vis_path)
+
+            return {
+                "visualization_path": vis_path,
+                "truly_unknown_coords": points
+            }
 
         except Exception as e:
             return {"error": str(e)}

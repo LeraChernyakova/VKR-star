@@ -6,8 +6,6 @@ class ParallelProcessingService:
     def __init__(self):
         self.service_name = "ParallelProcessingService"
         self.logger = Logger()
-        self.logger.info(self.service_name, "Service initialized")
-
 
     def execute_parallel_tasks(self, data, processors):
         results = {}

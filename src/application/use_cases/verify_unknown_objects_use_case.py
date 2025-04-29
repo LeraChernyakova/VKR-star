@@ -1,9 +1,21 @@
 from src.infrastructure.utils.logger import Logger
 
 from astropy.coordinates import SkyCoord
+from PIL import Image
 import astropy.units as u
 from astropy.time import Time
 import datetime
+import numpy as np
+
+
+def _extract_time(wcs):
+    try:
+        hdr = wcs.to_header()
+        date = hdr.get('DATE-OBS') or hdr.get('DATE')
+        return Time(date, format='isot') if date else None
+    except:
+        return None
+
 
 class VerifyUnknownObjectsUseCase:
     def __init__(self, catalog_service):
@@ -11,108 +23,104 @@ class VerifyUnknownObjectsUseCase:
         self.catalog = catalog_service
         self.logger = Logger()
 
-    def execute(self, image_path, pixel_coordinates, wcs, match_radius_arcsec=5):
+    def execute(self, image_path, pixel_coords, wcs, match_radius_arcsec=5):
+        self.logger.info(self.service_name, f"Старт проверки {len(pixel_coords)} кандидатов")
+
         try:
-            self.logger.info(self.service_name, f"Проверка {len(pixel_coordinates)} объектов")
-
-            observation_time = None
-            try:
-                if hasattr(wcs, "observation_date") and wcs.observation_date is not None:
-                    observation_time = Time(wcs.observation_date, format='isot')
-
-                if hasattr(wcs, "to_header"):
-                    header = wcs.to_header()
-                    if 'DATE-OBS' in header:
-                        observation_time = Time(header['DATE-OBS'], format='isot')
-                    if 'DATE' in header:
-                        observation_time = Time(header['DATE'], format='isot')
-
-            except Exception as e:
-                self.logger.warning(self.service_name, f"Ошибка при определении времени наблюдения: {e}")
-
-            sky_coords_list = []
-            for x_pixel, y_pixel in pixel_coordinates:
-                try:
-                    ra, dec = wcs.all_pix2world([[x_pixel, y_pixel]], 0)[0]
-                    sky_coords_list.append({
-                        "pixel_x": x_pixel,
-                        "pixel_y": y_pixel,
-                        "ra": ra,
-                        "dec": dec
-                    })
-                except Exception as e:
-                    self.logger.warning(self.service_name,
-                                        f"Ошибка преобразования координат ({x_pixel},{y_pixel}): {e}")
-
-            # Проверка наличия объектов для анализа
-            if not sky_coords_list:
-                return {"unknown_objects": [], "error": "Нет объектов для проверки"}
-
-            # Находим центр и радиус поиска
-            ras = [obj["ra"] for obj in sky_coords_list]
-            decs = [obj["dec"] for obj in sky_coords_list]
-            center_ra = sum(ras) / len(ras)
-            center_dec = sum(decs) / len(decs)
-
-            # Находим максимальное угловое расстояние между объектами
-            max_separation = 0
-            for ra, dec in zip(ras, decs):
-                sep = ((ra - center_ra) ** 2 + (dec - center_dec) ** 2) ** 0.5
-                max_separation = max(max_separation, sep)
-
-            # Добавляем запас к радиусу поиска
-            search_radius = max_separation + 0.05  # в градусах
-
-            # Запрашиваем объекты из каталогов
-            catalog_results = self.catalog.query_region(
-                center_ra, center_dec,
-                radius_deg=search_radius,
-                observation_time=observation_time  # Передаем только если оно определено достоверно
-            )
-
-            # Проверяем каждый объект
-            unknown_objects = []
-            known_objects = []
-
-            for obj in sky_coords_list:
-                is_known = False
-                ra, dec = obj["ra"], obj["dec"]
-
-                # Ищем ближайший объект в каталогах
-                for (cat_ra, cat_dec), catalog_entries in catalog_results.items():
-                    # Вычисляем расстояние в угловых секундах
-                    dist_deg = ((ra - cat_ra) ** 2 + (dec - cat_dec) ** 2) ** 0.5
-                    dist_arcsec = dist_deg * 3600
-
-                    if dist_arcsec <= match_radius_arcsec:
-                        is_known = True
-                        obj["catalog_match"] = catalog_entries
-                        obj["separation_arcsec"] = dist_arcsec
-                        known_objects.append(obj)
-                        break
-
-                if not is_known:
-                    unknown_objects.append(obj)
-
-            # Выводим результаты
-            print(f"\n=== РЕЗУЛЬТАТЫ АНАЛИЗА ОБЪЕКТОВ ===")
-            print(f"Всего объектов: {len(sky_coords_list)}")
-            print(f"Известные объекты: {len(known_objects)}")
-            print(f"Неизвестные объекты: {len(unknown_objects)}")
-
-            if unknown_objects:
-                print("\n=== НЕИЗВЕСТНЫЕ ОБЪЕКТЫ ===")
-                for i, obj in enumerate(unknown_objects, 1):
-                    print(f"{i}. Пиксели: ({obj['pixel_x']:.2f}, {obj['pixel_y']:.2f}), "
-                          f"RA={obj['ra']:.6f}°, DEC={obj['dec']:.6f}°")
-
-            return {
-                "unknown_objects": unknown_objects,
-                "known_objects": known_objects,
-                "total_count": len(sky_coords_list),
-                "unknown_count": len(unknown_objects)
-            }
-
+            img = Image.open(image_path)
+            width, height = img.size
         except Exception as e:
-            self.logger.error(self.service_name, f"Ошибка в проверке объектов: {str(e)}")
-            return {"error": str(e)}
+            self.logger.warning(self.service_name, f"Не удалось загрузить изображение для фильтрации: {e}")
+            width = height = None
+
+        fluxes = np.array([p.get('flux', 0) for p in pixel_coords])
+        flux_thresh = np.median(fluxes) * 0.5 if fluxes.size else 0
+        min_pixels = 12
+        max_axis_ratio = 2.5
+        margin = 8
+
+        filtered_pixels = []
+        for o in pixel_coords:
+            x, y = o.get('x', 0), o.get('y', 0)
+
+            if o.get('flag', 0) != 0:
+                continue
+
+            if o.get('npix', 0) < min_pixels:
+                continue
+
+            if o.get('flux', 0) < flux_thresh:
+                continue
+
+            a, b = o.get('a', 1), o.get('b', 1)
+            if a / max(b, 1e-3) > max_axis_ratio:
+                continue
+
+            if width and height:
+                if x < margin or x > width - margin or y < margin or y > height - margin:
+                    continue
+            filtered_pixels.append(o)
+
+        self.logger.info(self.service_name, f"После фильтрации осталось {len(filtered_pixels)} кандидатов")
+
+        if not filtered_pixels:
+            return {"unknown_objects": [], "known_objects": [],
+                    "total_count": len(pixel_coords), "unknown_count": 0}
+
+        ras, decs = [], []
+        for o in filtered_pixels:
+            ra, dec = wcs.all_pix2world([[o['x'], o['y']]], 0)[0]
+            ras.append(ra);
+            decs.append(dec)
+        det_coords = SkyCoord(ra=ras * u.deg, dec=decs * u.deg)
+
+        center = SkyCoord(ra=sum(ras) / len(ras) * u.deg,
+                          dec=sum(decs) / len(decs) * u.deg)
+        maxsep = max(center.separation(SkyCoord(ra=ra * u.deg, dec=dec * u.deg)).deg
+                     for ra, dec in zip(ras, decs)) + 0.05
+        catalog_results = self.catalog.query_region(
+            center.ra.deg, center.dec.deg,
+            radius_deg=maxsep,
+            observation_time=_extract_time(wcs)
+        )
+
+        cat_ras, cat_decs, cat_meta = [], [], []
+        for (ra, dec), entries in catalog_results.items():
+            for entry in entries:
+                cat_ras.append(ra);
+                cat_decs.append(dec);
+                cat_meta.append(entry)
+
+        if not cat_ras:
+            return {"unknown_objects": filtered_pixels, "unknown_count": len(filtered_pixels)}
+
+        cat_coords = SkyCoord(ra=cat_ras * u.deg, dec=cat_decs * u.deg)
+
+        idx_cat, idx_det, sep2d, _ = cat_coords.search_around_sky(
+            det_coords, match_radius_arcsec * u.arcsec
+        )
+
+        known_map = {}
+        for c_i, d_i, sep in zip(idx_cat, idx_det, sep2d.arcsec):
+            if d_i not in known_map or sep < known_map[d_i][0]:
+                known_map[d_i] = (sep, cat_meta[c_i])
+
+        known_objs, unknown_objs = [], []
+        for i, pc in enumerate(filtered_pixels):
+            if i in known_map:
+                sep, meta = known_map[i]
+                pc.update({"catalog_match": meta, "separation_arcsec": sep})
+                known_objs.append(pc)
+            else:
+                unknown_objs.append(pc)
+
+        self.logger.info(self.service_name,
+                         f"Из {len(filtered_pixels)}: "
+                         f"{len(unknown_objs)} неизвестных")
+        return {
+            "unknown_objects": unknown_objs,
+            "known_objects": known_objs,
+            "total_count": len(pixel_coords),
+            "unknown_count": len(unknown_objs)
+        }
+

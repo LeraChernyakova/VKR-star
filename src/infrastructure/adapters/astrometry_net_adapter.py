@@ -1,12 +1,8 @@
-import os
-
 from astrometry_net_client import Client as AstrometryNetClient
 from astropy.wcs import WCS
 
 from src.domain.interfaces.astrometry_service import IAstrometryService
-from src.infrastructure.utils.image_highlighter import ImageHighlighter
 from src.infrastructure.utils.logger import Logger
-
 
 class AstrometryNetAdapter(IAstrometryService):
     def __init__(self, api_key):
@@ -26,7 +22,7 @@ class AstrometryNetAdapter(IAstrometryService):
             job.until_done()
             job_id = getattr(job, "id", None)
             if not job_id or not job.success():
-                self.logger.error(self.service_name, "Калибровка не удалась")
+                self.logger.error(self.service_name, "Calibration failed")
                 return None
 
             rdls_hdul = job.rdls_file()
@@ -36,7 +32,7 @@ class AstrometryNetAdapter(IAstrometryService):
             dec_known = data['DEC'][known_mask]
 
             wcs_header = job.wcs_file()
-            wcs = WCS(wcs_header)
+            wcs = WCS(wcs_header, relax=True)
             x_pix, y_pix = wcs.all_world2pix(ra_known, dec_known, 0)
             pixel_coords = list(zip(x_pix, y_pix))
 
@@ -46,5 +42,5 @@ class AstrometryNetAdapter(IAstrometryService):
             }
 
         except Exception as e:
-            self.logger.error(self.service_name, f"Ошибка калибровки: {e}")
+            self.logger.error(self.service_name, f"Calibration error: {e}")
             return None
