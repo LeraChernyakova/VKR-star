@@ -9,6 +9,23 @@ from src.application.use_cases.process_image_use_case import ProcessImageUseCase
 from src.infrastructure.service.parallel_processing_service import ParallelProcessingService
 from src.infrastructure.adapters.sep_detection_adapter import SepDetectionAdapter
 
+def vcr_read_fix(original_read):
+    def new_read(self, *args, **kwargs):
+        if 'decode_content' in kwargs:
+            kwargs.pop('decode_content')
+        return original_read(self, *args, **kwargs)
+    return new_read
+
+
+original_vcr_read = vcr.stubs.VCRHTTPResponse.read
+vcr.stubs.VCRHTTPResponse.read = vcr_read_fix(original_vcr_read)
+
+# Оставшийся код без изменений
+my_vcr = vcr.VCR(
+    cassette_library_dir='tests/fixtures/vcr_cassettes',
+    record_mode='once',
+    decode_compressed_response=True
+)
 
 class TestApplicationIntegration:
     @pytest.fixture

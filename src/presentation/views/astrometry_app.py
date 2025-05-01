@@ -45,8 +45,17 @@ class AstrometryApp:
         self.btn_upload = ttk.Button(frame, text="Обработать", command=self.upload_file)
         self.btn_upload.pack(**padding)
 
-        self.label_status = ttk.Label(frame, text="Статус: —", foreground="black")
-        self.label_status.pack(**padding)
+        self.status_text = tk.Text(frame, height=5, width=50, wrap="word")
+        self.status_text.pack(padx=10, pady=10)
+        self.status_text.tag_config("green", foreground="green")
+        self.status_text.tag_config("black", foreground="black")
+        self.status_text.tag_config("blue", foreground="blue")
+        self.status_text.tag_config("red", foreground="red")
+        self.status_text.tag_config("orange", foreground="orange")
+        self.status_text.insert("1.0", "Статус: —", "black")
+        self.status_text.config(state="disabled")
+
+        self.status_text.configure(background=self.root.cget("background"))
 
         self.image_preview = tk.Label(frame)
         self.image_preview.pack(pady=10)
@@ -78,14 +87,17 @@ class AstrometryApp:
             messagebox.showwarning("Нет файла", "Пожалуйста, выберите файл.")
             return
 
-        self.label_status.config(text="Статус: В процессе...", foreground="blue")
+        self._update_status("В процессе...", "blue")
         threading.Thread(target=self._process_upload, daemon=True).start()
 
     def _process_upload(self):
         try:
             self._update_status("Начало обработки изображения...", "blue")
 
-            result = self.controller.analyze_image(self.file_path)
+            result = self.controller.analyze_image(
+                self.file_path,
+                status_callback=self._update_status
+            )
 
             if "error" in result:
                 self._update_status(f"Ошибка: {result['error']}", "red")
@@ -104,24 +116,41 @@ class AstrometryApp:
 
             unknown_objects = result.get("truly_unknown_coords", [])
 
-            count_message = f"Неизвестные объекты: {len(unknown_objects)} (выделены желтым)"
+            text_parts = [
+                ("Статус: Найдены неизвестные объекты на снимке", "green"),
+                (f"\nКоличество объектов: {len(unknown_objects)} (выделены желтым)", "black")
+            ]
 
             if unknown_objects:
-                coord_details = "\nКоординаты объектов:"
-                for i, obj in enumerate(unknown_objects[:3]):
-                    coord_details += f"\n{i + 1}. RA={obj.get('ra'):.5f}, Dec={obj.get('dec'):.5f}"
+                text_parts.append(("\nКоординаты объектов:", "black"))
+                for i, obj in enumerate(unknown_objects):
+                    text_parts.append((f"\n{i + 1}. RA={obj.get('ra_str')}, Dec={obj.get('dec_str')}", "black"))
 
-                if len(unknown_objects) > 3:
-                    coord_details += f"\n... и еще {len(unknown_objects) - 3} объект(ов)"
-
-                self._update_status(f"{count_message}{coord_details}", "black")
-            else:
-                self._update_status(count_message, "black")
+            self._update_formatted_status(text_parts)
         else:
             self._update_status("Обработка завершена, но изображение с результатами недоступно", "orange")
 
-    def _update_status(self, text, color):
-        self.label_status.config(text=f"Статус: {text}", foreground=color)
+    def _update_formatted_status(self, text_parts):
+        self.status_text.config(state="normal")
+        self.status_text.delete("1.0", "end")
+
+        self.status_text.configure(
+            background=self.root.cget("background"),
+            borderwidth=0,
+            highlightthickness=0,
+            relief="flat"
+        )
+
+        for text, color in text_parts:
+            self.status_text.insert("end", text, color)
+
+        self.status_text.config(state="disabled")
+
+    def _update_status(self, text, color="black"):
+        self.status_text.config(state="normal")
+        self.status_text.delete("1.0", "end")
+        self.status_text.insert("1.0", f"Статус: {text}", color)
+        self.status_text.config(state="disabled")
 
     def _show_image(self, image_path):
         try:
