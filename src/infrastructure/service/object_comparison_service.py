@@ -12,15 +12,22 @@ class ObjectComparisonService(IObjectComparisonService):
         self.logger = Logger()
 
     def find_unique_objects(self, detected_objects, reference_objects, match_threshold=10):
-        if reference_objects:
-            ref_coords = np.array(reference_objects)
-            tree = cKDTree(ref_coords)
+        if not detected_objects:
+            return []
 
-            det_coords = np.array([(o['x'], o['y']) for o in detected_objects])
-            dists, _ = tree.query(det_coords, distance_upper_bound=match_threshold)
+        if not reference_objects:
+            return detected_objects
 
-            unique = [obj for obj, dist in zip(detected_objects, dists) if dist > match_threshold]
-        else:
-            unique = detected_objects[:]
+        unique_objects = []
 
-        return unique
+        ref_coords = np.array([[coord[0], coord[1]] for coord in reference_objects])
+
+        for obj in detected_objects:
+            x, y = obj["x"], obj["y"]
+
+            distances = np.sqrt((ref_coords[:, 0] - x) ** 2 + (ref_coords[:, 1] - y) ** 2)
+
+            if np.min(distances) > match_threshold:
+                unique_objects.append(obj)
+
+        return unique_objects

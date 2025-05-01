@@ -1,7 +1,9 @@
 import time
+import warnings
 import concurrent.futures
 from typing import Dict, List, Tuple, Any, Optional
 from functools import lru_cache
+from astroquery.exceptions import NoResultsWarning
 
 from astropy.coordinates import SkyCoord, get_body, solar_system_ephemeris
 import astropy.units as u
@@ -45,6 +47,40 @@ class CelestialCatalogAdapter(ICatalogService):
             'uranus', 'neptune', 'pluto', 'moon', 'sun'
         ]
 
+    def query_all(self, ra: float, dec: float, radius_arcsec: float = 5) -> list:
+        from astropy.coordinates import SkyCoord, get_body, solar_system_ephemeris
+        coord = SkyCoord(ra=ra * u.deg, dec=dec * u.deg, frame="icrs")
+        radius = radius_arcsec * u.arcsec
+        results = []
+        for name, catalog in [("gaia", "I/355/gaiadr3"),
+                              ("usno", "I/284/out"),
+                              ("ps1", "II/349/ps1")]:
+            try:
+                tbl = self.vizier.query_region(coord, radius=radius, catalog=catalog)
+                if tbl and len(tbl[0]) > 0:
+                    results.extend([(name, row) for row in tbl[0]])
+            except Exception as e:
+                pass
+
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=NoResultsWarning)
+                try:
+                    if tbl and len(tbl[0]) > 0:
+                        results.extend([(name, row) for row in tbl[0]])
+                except Exception as e:
+                    pass
+
+            try:
+                if hasattr(MPC, "query_objects_in_sky"):
+                    mpc = MPC.query_objects_in_sky(coord.ra.deg, coord.dec.deg,
+                                                   radius = radius.value, limit = 20)
+                    if mpc and len(mpc) > 0:
+                        results.extend([("mpc", row) for row in mpc])
+            except Exception:
+                pass
+
+        return results
+
     @lru_cache(maxsize=64)
     def query_region(
         self,
@@ -62,7 +98,6 @@ class CelestialCatalogAdapter(ICatalogService):
                 res = self.vizier.query_region(coord, radius=radius, catalog="I/355/gaiadr3")
                 return "gaia", _process_vizier_results(res)
             except Exception as e:
-                self.logger.error(self.service_name, f"Ошибка запроса Gaia: {e}")
                 return "gaia", []
 
         def query_usno():
@@ -70,7 +105,6 @@ class CelestialCatalogAdapter(ICatalogService):
                 res = self.vizier.query_region(coord, radius=radius, catalog="I/284/out")
                 return "usno", _process_vizier_results(res)
             except Exception as e:
-                self.logger.error(self.service_name, f"Ошибка запроса USNO: {e}")
                 return "usno", []
 
         def query_simbad():
@@ -78,7 +112,6 @@ class CelestialCatalogAdapter(ICatalogService):
                 res = self.simbad.query_region(coord, radius=radius)
                 return "simbad", self._process_simbad_results(res)
             except Exception as e:
-                self.logger.error(self.service_name, f"Ошибка запроса SIMBAD: {e}")
                 return "simbad", []
 
         def query_asteroids():
@@ -91,7 +124,6 @@ class CelestialCatalogAdapter(ICatalogService):
                     return "mpc", self._process_mpc_results(res)
                 return "mpc", []
             except Exception as e:
-                self.logger.error(self.service_name, f"Ошибка запроса MPC: {e}")
                 return "mpc", []
 
         def query_ps1():
@@ -99,7 +131,6 @@ class CelestialCatalogAdapter(ICatalogService):
                 res = self.vizier.query_region(coord, radius=radius, catalog="II/349/ps1")
                 return "ps1", _process_vizier_results(res)
             except Exception as e:
-                self.logger.error(self.service_name, f"Ошибка запроса PS1: {e}")
                 return "ps1", []
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:

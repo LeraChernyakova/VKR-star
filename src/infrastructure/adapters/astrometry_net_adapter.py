@@ -3,8 +3,6 @@ from astropy.wcs import WCS
 
 from src.domain.interfaces.astrometry_service import IAstrometryService
 from src.infrastructure.utils.logger import Logger
-from PIL import Image
-
 
 class AstrometryNetAdapter(IAstrometryService):
     def __init__(self, api_key):
@@ -29,9 +27,15 @@ class AstrometryNetAdapter(IAstrometryService):
 
             rdls_hdul = job.rdls_file()
             data = rdls_hdul[1].data
-            known_mask = data['ref_id'] != -1
-            ra_known = data['RA'][known_mask]
-            dec_known = data['DEC'][known_mask]
+            if 'ref_id' in data.names:
+                known_mask = data['ref_id'] != -1
+                ra_known = data['RA'][known_mask]
+                dec_known = data['DEC'][known_mask]
+            else:
+                # Если ключа нет, используем все координаты
+                self.logger.warning(self.service_name, "Поле 'ref_id' не найдено, используем все координаты")
+                ra_known = data['RA']
+                dec_known = data['DEC']
 
             wcs_header = job.wcs_file()
             wcs = WCS(wcs_header, relax=True)
