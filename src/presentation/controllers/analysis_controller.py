@@ -56,8 +56,11 @@ class AnalysisController:
                     import astropy.units as u
 
                     coords = SkyCoord(ra=ra * u.deg, dec=dec * u.deg, frame='icrs')
-                    ra_str = coords.ra.to_string(unit=u.hour, sep='h ', precision=2, pad=True)
-                    dec_str = coords.dec.to_string(sep='° ', precision=2, alwayssign=True, pad=True)
+                    ra_hms = coords.ra.hms
+                    ra_str = f"{int(ra_hms.h):02d}h {int(ra_hms.m):02d}m {ra_hms.s:.2f}s"
+                    dec_dms = coords.dec.dms
+                    sign = '+' if dec_dms.d >= 0 else '-'
+                    dec_str = f"{sign}{int(abs(dec_dms.d)):02d}° {int(abs(dec_dms.m)):02d}' {abs(dec_dms.s):.2f}\""
 
                     truly_unknown_coords.append({
                         "x": x,

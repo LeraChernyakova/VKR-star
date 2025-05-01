@@ -45,13 +45,26 @@ class AstrometryApp:
         self.btn_upload = ttk.Button(frame, text="Обработать", command=self.upload_file)
         self.btn_upload.pack(**padding)
 
-        self.status_text = tk.Text(frame, height=5, width=50, wrap="word")
+        default_font = ttk.Style().lookup("TButton", "font") or "TkDefaultFont"
+
+        self.status_text = tk.Text(
+            frame,
+            height=5,
+            width=50,
+            wrap="word",
+            borderwidth=0,
+            highlightthickness=0,
+            relief="flat",
+            padx=0,
+            pady=0,
+            font=default_font
+        )
         self.status_text.pack(padx=10, pady=10)
-        self.status_text.tag_config("green", foreground="green")
-        self.status_text.tag_config("black", foreground="black")
-        self.status_text.tag_config("blue", foreground="blue")
-        self.status_text.tag_config("red", foreground="red")
-        self.status_text.tag_config("orange", foreground="orange")
+        self.status_text.tag_config("green", foreground="green", justify="center")
+        self.status_text.tag_config("black", foreground="black", justify="center")
+        self.status_text.tag_config("blue", foreground="blue", justify="center")
+        self.status_text.tag_config("red", foreground="red", justify="center")
+        self.status_text.tag_config("orange", foreground="orange", justify="center")
         self.status_text.insert("1.0", "Статус: —", "black")
         self.status_text.config(state="disabled")
 
