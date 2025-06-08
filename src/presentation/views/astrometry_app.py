@@ -1,15 +1,16 @@
-import tkinter as tk
-from tkinter import ttk, messagebox
-import threading
 import os
+import threading
+import tkinter as tk
+
 from PIL import Image, ImageTk
+from tkinter import ttk, messagebox
 from src.infrastructure.utils.logger import Logger
 
 
 class AstrometryApp:
     def __init__(self, root, controller):
         self.root = root
-        self.root.title("Определение местоположения космического объекта")
+        self.root.title("Определение местонахождения космического объекта")
         self.controller = controller
         self.file_path = None
         self.logger = Logger()
@@ -49,7 +50,7 @@ class AstrometryApp:
 
         self.status_text = tk.Text(
             frame,
-            height=5,
+            height=3,
             width=50,
             wrap="word",
             borderwidth=0,
@@ -59,7 +60,7 @@ class AstrometryApp:
             pady=0,
             font=default_font
         )
-        self.status_text.pack(padx=10, pady=10)
+        self.status_text.pack(padx=3, pady=3)
         self.status_text.tag_config("green", foreground="green", justify="center")
         self.status_text.tag_config("black", foreground="black", justify="center")
         self.status_text.tag_config("blue", foreground="blue", justify="center")
@@ -70,18 +71,64 @@ class AstrometryApp:
 
         self.status_text.configure(background=self.root.cget("background"))
 
-        self.image_preview = tk.Label(frame)
-        self.image_preview.pack(pady=10)
+        self.image_frame = ttk.Frame(frame)
+
+        self.canvas = tk.Canvas(self.image_frame, width=600, height=600,
+                                highlightthickness=1, highlightbackground="gray")
+        self.canvas.pack(side=tk.TOP)
+
+        self.zoom_frame = ttk.Frame(self.image_frame)
+        self.zoom_frame.pack(pady=2)
+
+        self.btn_zoom_out = ttk.Button(self.zoom_frame, text="–", width=3, command=self.zoom_out)
+        self.btn_zoom_out.pack(side=tk.LEFT, padx=2)
+
+        self.zoom_label = ttk.Label(self.zoom_frame, text="100%")
+        self.zoom_label.pack(side=tk.LEFT, padx=2)
+
+        self.btn_zoom_in = ttk.Button(self.zoom_frame, text="+", width=3, command=self.zoom_in)
+        self.btn_zoom_in.pack(side=tk.LEFT, padx=2)
+
+        self.btn_zoom_reset = ttk.Button(self.zoom_frame, text="Сброс", command=self.zoom_reset)
+        self.btn_zoom_reset.pack(side=tk.LEFT, padx=2)
+
+        self.original_image = None
+        self.displayed_image = None
+        self.zoom_level = 100
+        self.canvas_image_id = None
+        self.drag_start_x = 0
+        self.drag_start_y = 0
+        self.image_position = [0, 0]
+
+        self.canvas.bind("<ButtonPress-1>", self.start_drag)
+        self.canvas.bind("<B1-Motion>", self.drag)
+        self.canvas.bind("<MouseWheel>", self.mouse_wheel)
+        self.canvas.bind("<Button-4>", lambda e: self.mouse_wheel(e, 1))
+        self.canvas.bind("<Button-5>", lambda e: self.mouse_wheel(e, -1))
 
     def _build_info_tab(self, frame):
         info_text = (
-            "Эта программа выполняет определение местоположения космического объекта.\n\n"
-            "Для работы загрузите астрономический снимок в поддерживаемом формате.\n"
-            "Программа выполнит астрометрическую калибровку и поиск объектов, после чего\n"
-            "определит неизвестные (не присутствующие в астрономических каталогах) объекты."
+            "Данная программа предназначеня для выполнения определение местоположения неизвестного космического объекта по снимку звёздного неба.\n\n"
+            "Инструкция по работе:\n\n"
+            "Шаг 1. Для работы загрузите астрономический снимок в поддерживаемом формате.\n\n"
+            "Шаг 2. Нажмите кнопку обработки.\n\n"
+            "Шаг 3. Программа выполнит астрономическую калибровку и поиск неизвестных объектов.\n\n"
+            "Шаг 4. Результат работы программы - координаты объектов и изображение с выделенными объектами."
         )
 
-        text_widget = tk.Text(frame, wrap="word", bg=self.root.cget("bg"), borderwidth=0)
+        text_widget = tk.Text(
+            frame,
+            height=5,
+            width=50,
+            wrap="word",
+            borderwidth=0,
+            highlightthickness=0,
+            relief="flat",
+            padx=0,
+            pady=0,
+            font=ttk.Style().lookup("TButton", "font") or "TkDefaultFont"
+        )
+        text_widget.configure(background=self.root.cget("background"))
         text_widget.insert("1.0", info_text)
         text_widget.config(state="disabled")
         text_widget.pack(expand=True, fill="both", padx=10, pady=10)
@@ -165,12 +212,91 @@ class AstrometryApp:
         self.status_text.insert("1.0", f"Статус: {text}", color)
         self.status_text.config(state="disabled")
 
+    def start_drag(self, event):
+        self.drag_start_x = event.x
+        self.drag_start_y = event.y
+
+    def drag(self, event):
+        if not self.canvas_image_id:
+            return
+
+        dx = event.x - self.drag_start_x
+        dy = event.y - self.drag_start_y
+
+        self.image_position[0] += dx
+        self.image_position[1] += dy
+        self.drag_start_x = event.x
+        self.drag_start_y = event.y
+
+        self.canvas.move(self.canvas_image_id, dx, dy)
+
+    def mouse_wheel(self, event, delta=None):
+        if not self.original_image:
+            return
+
+        if delta is None:
+            delta = 1 if event.delta > 0 else -1
+
+        if delta > 0:
+            self.zoom_in()
+        else:
+            self.zoom_out()
+
+    def zoom_in(self):
+        if self.original_image and self.zoom_level < 300:
+            self.zoom_level += 20
+            self._update_image_with_zoom()
+
+    def zoom_out(self):
+        if self.original_image and self.zoom_level > 20:
+            self.zoom_level -= 20
+            self._update_image_with_zoom()
+
+    def zoom_reset(self):
+        if self.original_image:
+            self.zoom_level = 100
+            self.image_position = [0, 0]
+            self._update_image_with_zoom()
+
+    def _update_image_with_zoom(self):
+        if not self.original_image:
+            return
+
+        self.zoom_label.config(text=f"{self.zoom_level}%")
+
+        width = int(self.original_image.width * self.zoom_level / 100)
+        height = int(self.original_image.height * self.zoom_level / 100)
+
+        resized_img = self.original_image.resize((width, height), Image.LANCZOS)
+
+        self.displayed_image = ImageTk.PhotoImage(resized_img)
+
+        self.canvas.delete("all")
+
+        if self.zoom_level == 100 and self.image_position == [0, 0]:
+            x = max(0, (self.canvas.winfo_width() - width) // 2)
+            y = max(0, (self.canvas.winfo_height() - height) // 2)
+            self.image_position = [x, y]
+
+        self.canvas_image_id = self.canvas.create_image(
+            self.image_position[0], self.image_position[1],
+            image=self.displayed_image, anchor="nw"
+        )
+
     def _show_image(self, image_path):
         try:
-            image = Image.open(image_path)
-            image.thumbnail((300, 300))
-            photo = ImageTk.PhotoImage(image)
-            self.image_preview.configure(image=photo)
-            self.image_preview.image = photo
+            self.original_image = Image.open(image_path)
+
+            if not self.image_frame.winfo_ismapped():
+                self.image_frame.pack(pady=3)
+
+            self.zoom_level = 100
+            self.image_position = [0, 0]
+
+            canvas_width = min(600, self.original_image.width)
+            canvas_height = min(600, self.original_image.height)
+            self.canvas.config(width=canvas_width, height=canvas_height)
+
+            self._update_image_with_zoom()
         except Exception as e:
-            self.logger.error(f"Image display error: {str(e)}")
+            self.logger.error("AstrometryApp", f"Image display error: {str(e)}")

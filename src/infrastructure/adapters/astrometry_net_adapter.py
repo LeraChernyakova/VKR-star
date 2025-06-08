@@ -1,8 +1,11 @@
-from astrometry_net_client import Client as AstrometryNetClient
-from astropy.wcs import WCS
+import os
 
-from src.domain.interfaces.astrometry_service import IAstrometryService
+from astropy.wcs import WCS
 from src.infrastructure.utils.logger import Logger
+from astrometry_net_client import Client as AstrometryNetClient
+from src.domain.interfaces.astrometry_service import IAstrometryService
+from src.infrastructure.utils.image_highlighter import ImageHighlighter
+
 
 class AstrometryNetAdapter(IAstrometryService):
     def __init__(self, api_key):
@@ -32,8 +35,6 @@ class AstrometryNetAdapter(IAstrometryService):
                 ra_known = data['RA'][known_mask]
                 dec_known = data['DEC'][known_mask]
             else:
-                # Если ключа нет, используем все координаты
-                self.logger.warning(self.service_name, "Поле 'ref_id' не найдено, используем все координаты")
                 ra_known = data['RA']
                 dec_known = data['DEC']
 
@@ -41,6 +42,16 @@ class AstrometryNetAdapter(IAstrometryService):
             wcs = WCS(wcs_header, relax=True)
             x_pix, y_pix = wcs.all_world2pix(ra_known, dec_known, 0)
             pixel_coords = list(zip(x_pix, y_pix))
+
+            pixel_xy = [(x, y) for (x, y) in pixel_coords]
+            highlighter = ImageHighlighter(image_path)
+            highlighter.highlight_points(pixel_xy, radius=8, color="green")
+            base, ext = os.path.splitext(image_path)
+            base = base.replace("test-image", "processing")
+            os.makedirs(os.path.dirname(base), exist_ok=True)
+            filtered_vis_path = f"{base}_astrometry{ext}"
+            print(filtered_vis_path)
+            highlighter.save(filtered_vis_path)
 
             return {
                 "pixel_coords": pixel_coords,

@@ -1,5 +1,6 @@
 from src.infrastructure.utils.logger import Logger
 
+
 class DetectObjectsUseCase:
     def __init__(self, detection_service):
         self.service_name = "DetectObjectsUseCase"

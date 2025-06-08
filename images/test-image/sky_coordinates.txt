@@ -1,0 +1,9 @@
+filename,RA,Dec
+test_image1.png,12:02:29.22,79:46:34.98
+test_image2.png,12:00:04.31,28:50:38.53
+test_image3.png,7:04:49.04,55:28:57.74
+test_image4.png,14:44:11.65,3:55:52.76
+test_image5.png,13:42:35.14,17:09:47.37
+test_image6.png,13:38:09.28,30:59:09.54
+test_image7.png,12:54:56.51,42:53:13.81
+test_image8.png,14:29:29.25,-34:35:04.84

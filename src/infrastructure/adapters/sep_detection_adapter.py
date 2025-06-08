@@ -1,9 +1,11 @@
-import numpy as np
+import os
 import sep
+import numpy as np
 
 from PIL import Image
-from src.domain.interfaces.object_detection_service import IObjectDetectionService
 from src.infrastructure.utils.logger import Logger
+from src.infrastructure.utils.image_highlighter import ImageHighlighter
+from src.domain.interfaces.object_detection_service import IObjectDetectionService
 
 
 class SepDetectionAdapter(IObjectDetectionService):
@@ -62,5 +64,25 @@ class SepDetectionAdapter(IObjectDetectionService):
                 return {"error": "Несоответствие размеров массивов"}
 
         except Exception as e:
-            self.logger.error(self.service_name,f"Error in SEP processing: {str(e)}")
+            self.logger.error(self.service_name, f"Error in SEP processing: {str(e)}")
             return {"error": str(e)}
+
+    def _save_preprocessed_image(self, image_path: str, data_array: np.ndarray):
+        try:
+            output_dir = r"F:\ETU\VKR\repo\VKR-star\images\processing"
+            os.makedirs(output_dir, exist_ok=True)
+
+            filename = os.path.basename(image_path)
+            name, ext = os.path.splitext(filename)
+            output_path = os.path.join(output_dir, f"{name}_BackgroundSubtracted")
+
+            normalized_data = data_array - np.min(data_array)
+            if np.max(normalized_data) > 0:
+                normalized_data = normalized_data / np.max(normalized_data) * 255
+
+            img_data = normalized_data.astype(np.uint8)
+            img = Image.fromarray(img_data)
+            img.save(output_path)
+
+        except Exception as e:
+            self.logger.error(self.service_name, f"Error while saving preprocessed image: {e}")

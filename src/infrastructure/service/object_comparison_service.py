@@ -1,9 +1,8 @@
 import numpy as np
 
-from scipy.spatial import cKDTree
-
-from src.domain.interfaces.object_comparison_service import IObjectComparisonService
+from scipy.spatial import KDTree
 from src.infrastructure.utils.logger import Logger
+from src.domain.interfaces.object_comparison_service import IObjectComparisonService
 
 
 class ObjectComparisonService(IObjectComparisonService):
@@ -18,16 +17,17 @@ class ObjectComparisonService(IObjectComparisonService):
         if not reference_objects:
             return detected_objects
 
+        ref_coords = np.array([[coord[0], coord[1]] for coord in reference_objects])
+        kdtree = KDTree(ref_coords)
+
         unique_objects = []
 
-        ref_coords = np.array([[coord[0], coord[1]] for coord in reference_objects])
+        detected_coords = np.array([[obj["x"], obj["y"]] for obj in detected_objects])
 
-        for obj in detected_objects:
-            x, y = obj["x"], obj["y"]
+        distances, _ = kdtree.query(detected_coords, k=1)
 
-            distances = np.sqrt((ref_coords[:, 0] - x) ** 2 + (ref_coords[:, 1] - y) ** 2)
-
-            if np.min(distances) > match_threshold:
-                unique_objects.append(obj)
+        for i, distance in enumerate(distances):
+            if distance > match_threshold:
+                unique_objects.append(detected_objects[i])
 
         return unique_objects

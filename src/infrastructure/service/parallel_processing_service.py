@@ -1,15 +1,23 @@
 import threading
+
 from src.infrastructure.utils.logger import Logger
 
 
 class ParallelProcessingService:
-    def __init__(self):
+    def __init__(self, calibrate_image_use_case, detect_objects_use_case):
         self.service_name = "ParallelProcessingService"
+        self.calibrate_image_use_case = calibrate_image_use_case
+        self.detect_objects_use_case = detect_objects_use_case
         self.logger = Logger()
 
-    def execute_parallel_tasks(self, data, processors):
+    def execute_parallel_tasks(self, data):
         results = {}
         threads = []
+
+        processors = {
+            "astrometry": self.calibrate_image_use_case,
+            "detection": self.detect_objects_use_case
+        }
 
         for name, processor in processors.items():
             thread = threading.Thread(

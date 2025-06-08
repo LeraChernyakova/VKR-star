@@ -1,8 +1,9 @@
 import os
 import tkinter as tk
+
 from tkinter import filedialog
-from src.domain.interfaces.file_selection_service import IFileSelectionService
 from src.infrastructure.utils.logger import Logger
+from src.domain.interfaces.file_selection_service import IFileSelectionService
 
 
 class FileDialogService(IFileSelectionService):
